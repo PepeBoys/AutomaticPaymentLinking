@@ -122,6 +122,43 @@
         const processingFlags = {};
         const webhookStatusCache = {};
 
+        function createSelectElement(className, paymentType) {
+            const select = document.createElement('select');
+            select.className = className;
+            select.dataset.paymentType = paymentType;
+            select.style.cssText = 'width: 100%; padding: 8px 32px 8px 8px; border: 1px solid #ddd; border-radius: 4px; background: white url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23333" d="M10.293 3.293L6 7.586 1.707 3.293A1 1 0 00.293 4.707l5 5a1 1 0 001.414 0l5-5a1 1 0 10-1.414-1.414z"/></svg>\') no-repeat right 8px center; background-size: 12px; font-size: 14px; min-height: 36px; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none;';
+            
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Не менять';
+            select.appendChild(defaultOption);
+            
+            return select;
+        }
+
+        function initializeStatusSelects() {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="incoming_payment"]`);
+            if (!tab) return;
+
+            const paymentSuccessContainer = tab.querySelector('.js-payment-success-status-container');
+            const paymentFailureContainer = tab.querySelector('.js-payment-failure-status-container');
+            const documentSuccessContainer = tab.querySelector('.js-document-success-status-container');
+            const documentFailureContainer = tab.querySelector('.js-document-failure-status-container');
+
+            if (paymentSuccessContainer && !paymentSuccessContainer.querySelector('select')) {
+                paymentSuccessContainer.appendChild(createSelectElement('js-payment-success-status', 'incoming_payment'));
+            }
+            if (paymentFailureContainer && !paymentFailureContainer.querySelector('select')) {
+                paymentFailureContainer.appendChild(createSelectElement('js-payment-failure-status', 'incoming_payment'));
+            }
+            if (documentSuccessContainer && !documentSuccessContainer.querySelector('select')) {
+                documentSuccessContainer.appendChild(createSelectElement('js-document-success-status', 'incoming_payment'));
+            }
+            if (documentFailureContainer && !documentFailureContainer.querySelector('select')) {
+                documentFailureContainer.appendChild(createSelectElement('js-document-failure-status', 'incoming_payment'));
+            }
+        }
+
         function debounce(func, delay, key) {
             return function(...args) {
                 if (debounceTimers[key]) {
@@ -144,16 +181,14 @@
             const priorityRadios = tab.querySelectorAll('.js-document-priority');
             const checkbox = tab.querySelector('.js-auto-link-toggle');
             const maskInput = tab.querySelector('.js-payment-purpose-mask');
-            const paymentStatusSelects = tab.querySelectorAll('.js-payment-success-status, .js-payment-failure-status');
-            const documentStatusSelects = tab.querySelectorAll('.js-document-success-status, .js-document-failure-status');
+            const statusSelects = tab.querySelectorAll('select');
 
             documentRadios.forEach(radio => radio.disabled = disabled);
             linkRadios.forEach(radio => radio.disabled = disabled);
             priorityRadios.forEach(radio => radio.disabled = disabled);
             if (checkbox) checkbox.disabled = disabled;
             if (maskInput) maskInput.disabled = disabled;
-            paymentStatusSelects.forEach(select => select.disabled = disabled);
-            documentStatusSelects.forEach(select => select.disabled = disabled);
+            statusSelects.forEach(select => select.disabled = disabled);
         }
 
         function toggleMaskVisibility(paymentType) {
@@ -215,7 +250,10 @@
         }
 
         function populateStatusSelect(selectElement, states, selectedValue, emptyText, hintElement) {
-            if (!selectElement) return;
+            if (!selectElement) {
+                console.error('populateStatusSelect: selectElement is null');
+                return;
+            }
 
             selectElement.innerHTML = "";
 
@@ -232,19 +270,17 @@
                 selectElement.appendChild(option);
                 selectElement.disabled = true;
                 if (hintElement) hintElement.style.display = 'block';
-                return;
+            } else {
+                if (hintElement) hintElement.style.display = 'none';
+                selectElement.disabled = false;
+
+                states.forEach(state => {
+                    const option = document.createElement('option');
+                    option.value = state.id;
+                    option.textContent = state.name || state.id;
+                    selectElement.appendChild(option);
+                });
             }
-
-            if (hintElement) hintElement.style.display = 'none';
-            selectElement.disabled = false;
-
-            states.forEach(state => {
-                const option = document.createElement('option');
-                option.value = state.id;
-                option.textContent = state.name || state.id;
-                option.dataset.color = state.color || '';
-                selectElement.appendChild(option);
-            });
 
             if (selectedValue) {
                 selectElement.value = selectedValue;
@@ -311,30 +347,20 @@
                     }
                 })
                 .catch(error => {
-                    console.error('Не удалось загрузить статусы:', error);
+                    console.error('Ошибка загрузки статусов:', error);
                 });
         }
 
         function loadWebhookStatus() {
-            console.log("Загрузка статуса вебхуков...");
-
             fetch("/api/hooks/webhooks/status")
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log("Текущий статус вебхуков:", data.webhooks);
-
                     checkboxes.forEach((checkbox) => {
                         const paymentType = checkbox.dataset.paymentType;
                         const webhookData = data.webhooks[paymentType];
 
                         if (webhookData) {
                             checkbox.checked = webhookData.enabled;
-
                             webhookStatusCache[paymentType] = webhookData;
 
                             const documentPriority = webhookData.document_priority || 'oldest_first';
@@ -350,8 +376,6 @@
                             if (paymentType === 'incoming_payment') {
                                 loadStatuses(paymentType);
                             }
-
-                            console.log(`${paymentType}: enabled=${webhookData.enabled}, document_type=${webhookData.document_type}, link_type=${webhookData.link_type}, priority=${documentPriority}`);
                         }
 
                         checkbox.disabled = false;
@@ -369,11 +393,8 @@
             const settings = getTabSettings(paymentType);
 
             if (processingFlags[paymentType]) {
-                console.log(`Запрос для ${paymentType} уже обрабатывается, пропускаем`);
                 return;
             }
-
-            console.log(`Обновление настроек ${paymentType}:`, settings);
 
             processingFlags[paymentType] = true;
             setTabControlsDisabled(paymentType, true);
@@ -395,15 +416,8 @@
                     document_status_on_failure: settings.document_status_on_failure,
                 })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log("Настройки обновлены:", data);
-
                 if (data.status === "warning") {
                     alert(data.message);
                 } else if (data.status === "ok") {
@@ -429,11 +443,8 @@
             const settings = getTabSettings(paymentType);
 
             if (processingFlags[paymentType]) {
-                console.log(`Запрос для ${paymentType} уже обрабатывается, пропускаем`);
                 return;
             }
-
-            console.log(`Переключение ${paymentType}: ${enabled}`, settings);
 
             processingFlags[paymentType] = true;
             setTabControlsDisabled(paymentType, true);
@@ -456,15 +467,8 @@
                     document_status_on_failure: settings.document_status_on_failure,
                 })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log("Ответ сервера:", data);
-
                 if (data.status === "warning") {
                     checkbox.checked = !enabled;
                     alert(data.message || data.reason);
@@ -486,6 +490,8 @@
                 setTabControlsDisabled(paymentType, false);
             });
         }
+
+        initializeStatusSelects();
 
         checkboxes.forEach((checkbox) => {
             checkbox.addEventListener("change", function () {
@@ -535,21 +541,24 @@
             input.addEventListener('input', debouncedMaskUpdate);
         });
 
-        document.querySelectorAll('.js-payment-success-status, .js-payment-failure-status, .js-document-success-status, .js-document-failure-status').forEach((select) => {
-            const paymentType = select.dataset.paymentType;
+        setTimeout(() => {
+            document.addEventListener('change', function(e) {
+                if (e.target.matches('.js-payment-success-status, .js-payment-failure-status, .js-document-success-status, .js-document-failure-status')) {
+                    const paymentType = e.target.dataset.paymentType;
+                    const debouncedStatusUpdate = debounce(function() {
+                        const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
 
-            const debouncedStatusUpdate = debounce(function() {
-                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
-
-                if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
-                    updateLinkSettings(paymentType);
+                        if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
+                            updateLinkSettings(paymentType);
+                        }
+                    }, 400, `status_${paymentType}_${e.target.className}`);
+                    
+                    debouncedStatusUpdate();
                 }
-            }, 400, `status_${paymentType}_${select.className}`);
+            });
 
-            select.addEventListener('change', debouncedStatusUpdate);
-        });
-
-        loadWebhookStatus();
+            loadWebhookStatus();
+        }, 100);
     });
 </script>
 
@@ -572,6 +581,18 @@
     .check__input:disabled ~ .check__text {
         opacity: 0.6;
         cursor: not-allowed;
+    }
+
+    select:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background-color: #f5f5f5;
+    }
+
+    select:focus {
+        outline: none;
+        border-color: #4a90e2;
+        box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
     }
 </style>
 {% endblock %}
