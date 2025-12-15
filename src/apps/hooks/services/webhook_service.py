@@ -290,6 +290,7 @@ class WebhookService:
         request_id: str | None,
         payload,
         paymentin_service,
+        cashin_service,
         customerorder_service,
         invoiceout_service,
         demand_service=None,
@@ -301,6 +302,7 @@ class WebhookService:
             request_id: ID запроса вебхука
             payload: Данные webhook
             paymentin_service: Сервис работы с платежами
+            cashin_service: Сервис работы с приходными ордерами
             customerorder_service: Сервис работы с заказами
         """
         if not request_id:
@@ -312,8 +314,12 @@ class WebhookService:
         if demand_service is None:
             raise ValueError("DemandService dependency is required")
 
+        if cashin_service is None:
+            raise ValueError("CashInService dependency is required")
+
         handler = WebhookHandler(
             paymentin_service,
+            cashin_service,
             customerorder_service,
             invoiceout_service,
             demand_service,
@@ -341,3 +347,23 @@ class WebhookService:
                     logger.info("Результат обработки платежа: success=%s, message=%s", result["success"], result["message"])
                 else:
                     logger.warning("Активная подписка не найдена для аккаунта %s и типа %s", event.accountId, event.meta.type)
+            elif event.meta.type == "cashin" and event.action == "CREATE":
+                subscription = await self._uow.webhooks.get_active_subscription_for_event(
+                    account_id=event.accountId,
+                    entity_type=event.meta.type,
+                    payment_type=PaymentType.incoming_order,
+                )
+
+                if subscription:
+                    result = await handler.handle_cashin_create(event.meta.href, subscription)
+                    logger.info(
+                        "Результат обработки приходного ордера: success=%s, message=%s",
+                        result["success"],
+                        result["message"],
+                    )
+                else:
+                    logger.warning(
+                        "Активная подписка не найдена для аккаунта %s и типа %s",
+                        event.accountId,
+                        event.meta.type,
+                    )
