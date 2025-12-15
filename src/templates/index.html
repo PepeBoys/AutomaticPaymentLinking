@@ -385,7 +385,7 @@
         }
 
         function loadStatuses(paymentType) {
-            if (paymentType !== 'incoming_payment') return;
+            if (!['incoming_payment', 'incoming_order'].includes(paymentType)) return;
 
             const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
             if (!tab) return;

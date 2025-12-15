@@ -8,7 +8,7 @@ from typing import Optional
 @dataclass
 class PaymentInEntity:
     """Доменная сущность входящего платежа."""
-    
+
     id: str
     account_id: str
     name: str
