@@ -4,6 +4,8 @@ import logging
 import re
 from datetime import datetime
 
+from ...cashin.exceptions import CashInNotFoundError
+from ...cashin.services.cashin_service import CashInService
 from ...customerorder.exceptions import CustomerOrderNotFoundError
 from ...customerorder.services.customerorder_service import CustomerOrderService
 from ...demand.exceptions import DemandNotFoundError
@@ -24,24 +26,32 @@ class WebhookHandler:
     def __init__(
         self,
         paymentin_service: PaymentInService,
+        cashin_service: CashInService,
         customerorder_service: CustomerOrderService,
         invoiceout_service: InvoiceOutService,
         demand_service: DemandService,
     ):
         self.paymentin_service = paymentin_service
+        self.cashin_service = cashin_service
         self.customerorder_service = customerorder_service
         self.invoiceout_service = invoiceout_service
         self.demand_service = demand_service
 
-    async def handle_paymentin_create(
-        self, event_href: str, subscription: WebhookEntity
+    async def _handle_incoming_payment(
+        self,
+        payment_service,
+        event_href: str,
+        subscription: WebhookEntity,
+        not_found_exception: type[Exception],
+        payment_label: str,
     ) -> dict:
-        """Обработать событие создания входящего платежа."""
+        """Обработать событие создания входящего платежа/ордера."""
 
         try:
-            payment = await self.paymentin_service.get_by_href(event_href)
+            payment = await payment_service.get_by_href(event_href)
             logger.info(
-                "Обработка платежа: id=%s, sum=%s, agent=%s",
+                "Обработка %s: id=%s, sum=%s, agent=%s",
+                payment_label,
                 payment.id,
                 payment.sum,
                 payment.agent_id,
@@ -50,6 +60,7 @@ class WebhookHandler:
             linked_documents = []
             if subscription.link_type == LinkType.counterparty:
                 document, linked_sum, linked_documents = await self._link_payment_by_counterparty(
+                    payment_service=payment_service,
                     payment=payment,
                     document_type=subscription.document_type,
                     organization_id=(
@@ -60,6 +71,7 @@ class WebhookHandler:
                     prioritize_oldest=(
                         subscription.document_priority == DocumentPriority.oldest_first
                     ),
+                    payment_label=payment_label,
                 )
             else:
                 document = await self._find_document_for_payment(
@@ -82,7 +94,8 @@ class WebhookHandler:
 
             if not document or linked_sum <= 0:
                 logger.warning(
-                    "Не найден документ для платежа %s (agent=%s, sum=%s, strategy=%s, type=%s)",
+                    "Не найден документ для %s %s (agent=%s, sum=%s, strategy=%s, type=%s)",
+                    payment_label,
                     payment.id,
                     payment.agent_id,
                     payment.sum,
@@ -90,7 +103,7 @@ class WebhookHandler:
                     subscription.document_type,
                 )
                 await self._apply_payment_state(
-                    payment.id, subscription.payment_status_on_failure
+                    payment_service, payment.id, subscription.payment_status_on_failure
                 )
                 return {
                     "success": False,
@@ -98,20 +111,23 @@ class WebhookHandler:
                 }
 
             if subscription.link_type != LinkType.counterparty:
-                await self.paymentin_service.link_to_document(
+                await payment_service.link_to_document(
                     payment_id=payment.id,
                     document_meta_href=document.meta_href,
                     linked_sum=payment.sum,
                 )
 
             await self._apply_project_from_document(
+                payment_service=payment_service,
                 payment_id=payment.id,
                 document=document,
                 transfer_project=subscription.transfer_project_to_payment,
+                payment_label=payment_label,
             )
 
             logger.info(
-                "✓ Платеж %s привязан к %s %s (сумма: %s)",
+                "✓ %s %s привязан к %s %s (сумма: %s)",
+                payment_label.capitalize(),
                 payment.id,
                 subscription.document_type.value,
                 document.name,
@@ -119,7 +135,7 @@ class WebhookHandler:
             )
 
             await self._apply_payment_state(
-                payment.id, subscription.payment_status_on_success
+                payment_service, payment.id, subscription.payment_status_on_success
             )
             await self._apply_document_states(
                 linked_documents,
@@ -130,7 +146,7 @@ class WebhookHandler:
             response = {
                 "success": True,
                 "message": (
-                    f"Платеж привязан к {subscription.document_type.value} {document.name}"
+                    f"{payment_label.capitalize()} привязан к {subscription.document_type.value} {document.name}"
                 ),
                 "payment_id": payment.id,
                 "document_id": document.id,
@@ -142,23 +158,54 @@ class WebhookHandler:
 
             return response
 
-        except PaymentInNotFoundError as exc:
-            logger.warning("Платеж по ссылке %s не найден: %s", event_href, exc)
-            return {"success": False, "message": "Платеж не найден в МойСклад"}
+        except not_found_exception as exc:  # type: ignore[misc]
+            logger.warning(
+                "%s по ссылке %s не найден: %s",
+                payment_label.capitalize(),
+                event_href,
+                exc,
+            )
+            return {
+                "success": False,
+                "message": f"{payment_label.capitalize()} не найден в МойСклад",
+            }
         except (
             CustomerOrderNotFoundError,
             InvoiceOutNotFoundError,
             DemandNotFoundError,
         ) as exc:
-            logger.warning("Документ для платежа %s не найден: %s", event_href, exc)
+            logger.warning("Документ для %s %s не найден: %s", payment_label, event_href, exc)
             await self._apply_payment_state(
-                payment.id if 'payment' in locals() else None,
+                payment_service,
+                payment.id if "payment" in locals() else None,
                 subscription.payment_status_on_failure,
             )
             return {"success": False, "message": "Документ для привязки не найден"}
         except Exception as exc:  # pragma: no cover - защитный блок
-            logger.exception("Ошибка при обработке платежа: %s", str(exc))
+            logger.exception("Ошибка при обработке %s: %s", payment_label, str(exc))
             raise
+
+    async def handle_paymentin_create(
+        self, event_href: str, subscription: WebhookEntity
+    ) -> dict:
+        return await self._handle_incoming_payment(
+            payment_service=self.paymentin_service,
+            event_href=event_href,
+            subscription=subscription,
+            not_found_exception=PaymentInNotFoundError,
+            payment_label="платеж",
+        )
+
+    async def handle_cashin_create(
+        self, event_href: str, subscription: WebhookEntity
+    ) -> dict:
+        return await self._handle_incoming_payment(
+            payment_service=self.cashin_service,
+            event_href=event_href,
+            subscription=subscription,
+            not_found_exception=CashInNotFoundError,
+            payment_label="приходный ордер",
+        )
 
     async def _find_document_for_payment(
         self,
@@ -202,10 +249,12 @@ class WebhookHandler:
 
     async def _link_payment_by_counterparty(
         self,
+        payment_service,
         payment,
         document_type: DocumentType,
         organization_id: str | None,
         prioritize_oldest: bool,
+        payment_label: str,
     ):
         """Привязать платеж по контрагенту к нескольким документам по очереди."""
 
@@ -233,14 +282,15 @@ class WebhookHandler:
             if linked_sum <= 0:
                 break
 
-            await self.paymentin_service.link_to_document(
+            await payment_service.link_to_document(
                 payment_id=payment.id,
                 document_meta_href=document.meta_href,
                 linked_sum=linked_sum,
             )
 
             logger.info(
-                "Часть платежа %s привязана к %s %s: linked_sum=%s, unpaid_before=%s, remaining_payment=%s",
+                "Часть %s %s привязана к %s %s: linked_sum=%s, unpaid_before=%s, remaining_payment=%s",
+                payment_label,
                 payment.id,
                 document_type.value,
                 document.name,
@@ -259,14 +309,21 @@ class WebhookHandler:
         total_linked = payment.sum - remaining_sum
         return last_linked_document, total_linked, linked_documents
 
-    async def _apply_payment_state(self, payment_id: str | None, state_id: str | None) -> None:
+    async def _apply_payment_state(
+        self, payment_service, payment_id: str | None, state_id: str | None
+    ) -> None:
         """Применить статус к платежу, если задан."""
 
         if payment_id and state_id:
-            await self.paymentin_service.update_state(payment_id, state_id)
+            await payment_service.update_state(payment_id, state_id)
 
     async def _apply_project_from_document(
-        self, payment_id: str, document, transfer_project: bool
+        self,
+        payment_service,
+        payment_id: str,
+        document,
+        transfer_project: bool,
+        payment_label: str,
     ) -> None:
         """Перенести проект из документа в платеж при необходимости."""
 
@@ -277,21 +334,26 @@ class WebhookHandler:
 
         if not project_href:
             logger.info(
-                "Проект не перенесен для платежа %s: у документа нет проекта",
+                "Проект не перенесен для %s %s: у документа нет проекта",
+                payment_label,
                 payment_id,
             )
             return
 
         try:
-            await self.paymentin_service.update_project(payment_id, project_href)
+            await payment_service.update_project(payment_id, project_href)
             logger.info(
-                "✓ Проект перенесен в платеж %s из документа %s",
+                "✓ Проект перенесен в %s %s из документа %s",
+                payment_label,
                 payment_id,
                 document.name if document else "",
             )
         except Exception as exc:  # pragma: no cover - сетевые ошибки
             logger.warning(
-                "Не удалось перенести проект в платеж %s: %s", payment_id, exc
+                "Не удалось перенести проект в %s %s: %s",
+                payment_label,
+                payment_id,
+                exc,
             )
 
     async def _apply_document_states(
