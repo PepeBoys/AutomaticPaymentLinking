@@ -97,6 +97,7 @@ class DemandClient:
         agent_id: str,
         sum_value: float,
         tolerance: float = 0.01,
+        organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ) -> List[Dict[str, Any]]:
         """Поиск отгрузок по контрагенту и сумме."""
@@ -110,6 +111,12 @@ class DemandClient:
             f"sum<={sum_max}",
         ]
 
+        if organization_id:
+            filter_parts.append(
+                "organization=https://api.moysklad.ru/api/remap/1.2/entity/organization/"
+                f"{organization_id}"
+            )
+
         filter_str = ";".join(filter_parts)
         order = "moment,asc" if prioritize_oldest else "moment,desc"
 
@@ -118,6 +125,7 @@ class DemandClient:
     async def search_by_agent(
         self,
         agent_id: str,
+        organization_id: str | None = None,
         date_from: Optional[datetime] = None,
         limit: int = 100,
         order: str = "moment,asc"
@@ -127,6 +135,12 @@ class DemandClient:
         filter_parts = [
             f"agent=https://api.moysklad.ru/api/remap/1.2/entity/counterparty/{agent_id}",
         ]
+
+        if organization_id:
+            filter_parts.append(
+                "organization=https://api.moysklad.ru/api/remap/1.2/entity/organization/"
+                f"{organization_id}"
+            )
 
         if date_from:
             # МойСклад работает в MSK (UTC+3)

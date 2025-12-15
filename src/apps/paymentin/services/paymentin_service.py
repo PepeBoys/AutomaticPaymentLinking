@@ -89,6 +89,12 @@ class PaymentInService:
         
         updated_data = await self._client.update_operations(payment_id, operations)
         return self._to_entity(updated_data)
+
+    async def update_project(self, payment_id: str, project_href: str) -> PaymentInEntity:
+        """Обновить проект платежа."""
+
+        updated_data = await self._client.update_project(payment_id, project_href)
+        return self._to_entity(updated_data)
     
     @staticmethod
     def _to_entity(data: dict) -> PaymentInEntity:
@@ -108,6 +114,9 @@ class PaymentInService:
         org_meta = data.get("organization", {}).get("meta", {})
         org_href = org_meta.get("href", "")
         org_id = org_href.split("/")[-1] if org_href else ""
+
+        project_meta = data.get("project", {}).get("meta", {})
+        project_href = project_meta.get("href") if project_meta else None
         
         linked_ops = [
             {
@@ -132,6 +141,7 @@ class PaymentInService:
             payment_purpose=data.get("paymentPurpose"),
             linked_operations=linked_ops,
             meta_href=data["meta"]["href"],
+            project_meta_href=project_href,
         )
     
     @staticmethod
