@@ -39,10 +39,16 @@ async def get_states(
     invoiceout_service: InvoiceOutSvcDep = None,
     demand_service: DemandSvcDep = None,
 ):
-    if payment_type not in (PaymentType.incoming_payment, PaymentType.incoming_order):
+    if payment_type not in (
+        PaymentType.incoming_payment,
+        PaymentType.incoming_order,
+        PaymentType.outgoing_payment,
+    ):
         raise HTTPException(
             status_code=400,
-            detail="Статусы доступны только для входящих платежей и приходных ордеров",
+            detail=(
+                "Статусы доступны только для входящих платежей, приходных и исходящих платежей"
+            ),
         )
 
     def _map_states(raw_states: list) -> list[dict]:
