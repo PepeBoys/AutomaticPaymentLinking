@@ -61,6 +61,9 @@ class WebhookHandler:
                     document_type=subscription.document_type,
                     link_type=subscription.link_type,
                     payment_purpose_mask=subscription.payment_purpose_mask,
+                    prioritize_oldest=(
+                        subscription.document_priority == DocumentPriority.oldest_first
+                    ),
                 )
                 linked_sum = payment.sum if document else 0
 
@@ -128,22 +131,32 @@ class WebhookHandler:
         document_type: DocumentType,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
+        prioritize_oldest: bool = True,
     ):
         """Найти подходящий документ по типу и стратегии."""
 
         if document_type == DocumentType.customerorder:
             return await self._find_order_for_payment(
-                payment, link_type, payment_purpose_mask
+                payment,
+                link_type,
+                payment_purpose_mask,
+                prioritize_oldest=prioritize_oldest,
             )
 
         if document_type == DocumentType.invoiceout:
             return await self._find_invoice_for_payment(
-                payment, link_type, payment_purpose_mask
+                payment,
+                link_type,
+                payment_purpose_mask,
+                prioritize_oldest=prioritize_oldest,
             )
 
         if document_type == DocumentType.demand:
             return await self._find_demand_for_payment(
-                payment, link_type, payment_purpose_mask
+                payment,
+                link_type,
+                payment_purpose_mask,
+                prioritize_oldest=prioritize_oldest,
             )
 
         return None
@@ -235,7 +248,11 @@ class WebhookHandler:
         return []
 
     async def _find_order_for_payment(
-        self, payment, link_type: LinkType, payment_purpose_mask: str | None = None
+        self,
+        payment,
+        link_type: LinkType,
+        payment_purpose_mask: str | None = None,
+        prioritize_oldest: bool = True,
     ):
         """Найти подходящий заказ в зависимости от стратегии."""
 
@@ -265,7 +282,11 @@ class WebhookHandler:
         return None
 
     async def _find_invoice_for_payment(
-        self, payment, link_type: LinkType, payment_purpose_mask: str | None = None
+        self,
+        payment,
+        link_type: LinkType,
+        payment_purpose_mask: str | None = None,
+        prioritize_oldest: bool = True,
     ):
         """Найти подходящий счет покупателю для платежа."""
 
@@ -290,12 +311,17 @@ class WebhookHandler:
                 payment=payment,
                 document_type=DocumentType.invoiceout,
                 payment_purpose_mask=payment_purpose_mask,
+                prioritize_oldest=prioritize_oldest,
             )
 
         return None
 
     async def _find_demand_for_payment(
-        self, payment, link_type: LinkType, payment_purpose_mask: str | None = None
+        self,
+        payment,
+        link_type: LinkType,
+        payment_purpose_mask: str | None = None,
+        prioritize_oldest: bool = True,
     ):
         """Найти подходящую отгрузку для платежа."""
 
@@ -320,6 +346,7 @@ class WebhookHandler:
                 payment=payment,
                 document_type=DocumentType.demand,
                 payment_purpose_mask=payment_purpose_mask,
+                prioritize_oldest=prioritize_oldest,
             )
 
         return None
@@ -329,6 +356,7 @@ class WebhookHandler:
         payment,
         document_type: DocumentType,
         payment_purpose_mask: str | None,
+        prioritize_oldest: bool = True,
     ):
         """Найти документ по данным из назначения платежа."""
 
@@ -346,6 +374,7 @@ class WebhookHandler:
                     name=name,
                     agent_id=payment.agent_id,
                     moment=moment,
+                    prioritize_oldest=prioritize_oldest,
                 )
 
             if document_type == DocumentType.invoiceout:
@@ -353,6 +382,7 @@ class WebhookHandler:
                     name=name,
                     agent_id=payment.agent_id,
                     moment=moment,
+                    prioritize_oldest=prioritize_oldest,
                 )
 
             if document_type == DocumentType.demand:
@@ -360,6 +390,7 @@ class WebhookHandler:
                     name=name,
                     agent_id=payment.agent_id,
                     moment=moment,
+                    prioritize_oldest=prioritize_oldest,
                 )
         except (CustomerOrderNotFoundError, InvoiceOutNotFoundError, DemandNotFoundError):
             return None
@@ -381,6 +412,16 @@ class WebhookHandler:
                 moment = self._parse_moment(moment_str) if moment_str else None
                 return name.strip() if name else None, moment
 
+        generic_match = re.search(
+            r"№\s*(?P<name>.+?)(?:\s+от\s+(?P<moment>\d{1,2}[./-]\d{1,2}[./-]\d{2,4}))?(?:\b|$)",
+            payment_purpose,
+            re.IGNORECASE,
+        )
+        if generic_match:
+            name = generic_match.group("name")
+            moment_str = generic_match.group("moment")
+            return name.strip(), self._parse_moment(moment_str)
+
         patterns = [
             r"(?:заказ|order|№)\s*(\d+)",
             r"\b(\d{5,})\b",
@@ -398,14 +439,11 @@ class WebhookHandler:
 
     @staticmethod
     def _build_mask_regex(payment_purpose_mask: str) -> re.Pattern:
-        escaped = re.escape(payment_purpose_mask)
+        placeholder_pattern = (
+            r"№\s*(?P<name>.+?)(?:\s+от\s+(?P<moment>\d{1,2}[./-]\d{1,2}[./-]\d{2,4}))?(?:\b|$)"
+        )
 
-        escaped = escaped.replace(r"\$name", r"(?P<name>.+?)")
-        escaped = escaped.replace(r"\$moment", r"(?P<moment>\d{2}\.\d{2}\.\d{4})")
-
-        escaped = escaped.replace(r"\ ", r"\s+")
-
-        return re.compile(escaped, re.IGNORECASE)
+        return re.compile(placeholder_pattern, re.IGNORECASE)
 
     @staticmethod
     def _parse_moment(moment_str: str | None) -> datetime | None:

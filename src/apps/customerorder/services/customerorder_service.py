@@ -87,11 +87,15 @@ class CustomerOrderService:
             payment_sum,
             search_by_sum,
         )
-        
+
         return entities
-    
+
     async def find_by_name_and_agent(
-        self, name: str, agent_id: str, moment: Optional[datetime] = None
+        self,
+        name: str,
+        agent_id: str,
+        moment: Optional[datetime] = None,
+        prioritize_oldest: bool = True,
     ) -> CustomerOrderEntity:
         """Найти заказ по номеру и контрагенту."""
         filter_parts = [
@@ -106,7 +110,11 @@ class CustomerOrderService:
             filter_parts.append(f"moment<={end.strftime('%Y-%m-%d %H:%M:%S')}")
 
         filter_str = ";".join(filter_parts)
-        orders_data = await self._client.search(filter_str=filter_str, limit=1)
+        orders_data = await self._client.search(
+            filter_str=filter_str,
+            limit=10 if moment else 100,
+            order="moment,asc" if prioritize_oldest else "moment,desc",
+        )
 
         if not orders_data:
             raise CustomerOrderNotFoundError(

@@ -56,7 +56,11 @@ class DemandService:
         return entities
     
     async def find_by_name_and_agent(
-        self, name: str, agent_id: str, moment: Optional[datetime] = None
+        self,
+        name: str,
+        agent_id: str,
+        moment: Optional[datetime] = None,
+        prioritize_oldest: bool = True,
     ) -> DemandEntity:
         """Найти отгрузку по номеру и контрагенту."""
 
@@ -66,14 +70,18 @@ class DemandService:
         ]
 
         if moment:
-            start = moment.replace(hour=0, minute=0, second=0, microsecond=0)
-            end = moment.replace(hour=23, minute=59, second=59, microsecond=999999)
-            filter_parts.append(f"moment>={start.isoformat()}")
-            filter_parts.append(f"moment<={end.isoformat()}")
+            msk_tz = timezone(timedelta(hours=3)) 
+
+            start = moment.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(msk_tz)
+            end = moment.replace(hour=23, minute=59, second=59, microsecond=999999).astimezone(msk_tz)
+
+            filter_parts.append(f"moment>={start.strftime('%Y-%m-%d %H:%M:%S')}")
+            filter_parts.append(f"moment<={end.strftime('%Y-%m-%d %H:%M:%S')}")
 
         demands_data = await self._client.search(
             filter_str=";".join(filter_parts),
-            limit=1,
+            limit=10 if moment else 100,
+            order="moment,asc" if prioritize_oldest else "moment,desc",
         )
 
         if not demands_data:
