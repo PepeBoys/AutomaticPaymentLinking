@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from ..payment_base.domain.entities import BasePaymentEntity
+from ...payment_base.domain.entities import BasePaymentEntity
 
 
 @dataclass

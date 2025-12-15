@@ -1,6 +1,6 @@
 """Клиент для работы с отгрузками."""
 
-from ..payable_document_base.services.base_client import BaseDocumentClient
+from ...payable_document_base.services.base_client import BaseDocumentClient
 
 
 class DemandClient(BaseDocumentClient):

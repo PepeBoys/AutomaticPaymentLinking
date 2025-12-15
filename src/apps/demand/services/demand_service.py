@@ -3,10 +3,10 @@
 import logging
 
 from ...ms_auth.services.auth_service import MySkladAuthService
+from ...payable_document_base.services.base_client import BaseDocumentClient
+from ...payable_document_base.services.base_service import BaseDocumentService
 from ..domain.entities import DemandEntity
 from ..exceptions import DemandNotFoundError
-from ..payable_document_base.services.base_client import BaseDocumentClient
-from ..payable_document_base.services.base_service import BaseDocumentService
 from .demand_client import DemandClient
 
 logger = logging.getLogger(__name__)

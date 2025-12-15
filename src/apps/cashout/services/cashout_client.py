@@ -1,6 +1,6 @@
 """Клиент для работы с API расходных ордеров."""
 
-from ..payment_base.services.base_client import BasePaymentClient
+from ...payment_base.services.base_client import BasePaymentClient
 
 
 class CashOutClient(BasePaymentClient):

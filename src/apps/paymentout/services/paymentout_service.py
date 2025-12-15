@@ -3,9 +3,9 @@
 import logging
 
 from ...ms_auth.services.auth_service import MySkladAuthService
+from ...payment_base.services.base_client import BasePaymentClient
+from ...payment_base.services.base_service import BasePaymentService
 from ..domain.entities import PaymentOutEntity
-from ..payment_base.services.base_client import BasePaymentClient
-from ..payment_base.services.base_service import BasePaymentService
 from .paymentout_client import PaymentOutClient
 
 logger = logging.getLogger(__name__)
