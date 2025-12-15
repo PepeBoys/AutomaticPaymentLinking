@@ -29,6 +29,7 @@ class InvoiceOutService:
         agent_id: str,
         payment_sum: float,
         search_by_sum: bool = True,
+        organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ) -> List[InvoiceOutEntity]:
         """Найти счета для привязки платежа."""
@@ -36,11 +37,13 @@ class InvoiceOutService:
             invoices_data = await self._client.search_by_agent_and_sum(
                 agent_id=agent_id,
                 sum_value=payment_sum,
+                organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
         else:
             invoices_data = await self._client.search_by_agent(
                 agent_id=agent_id,
+                organization_id=organization_id,
                 date_from=datetime.now(timezone.utc) - timedelta(days=60),
                 limit=10,
                 order="moment,asc" if prioritize_oldest else "moment,desc",
@@ -63,6 +66,7 @@ class InvoiceOutService:
         self,
         name: str,
         agent_id: str,
+        organization_id: str | None = None,
         moment: Optional[datetime] = None,
         prioritize_oldest: bool = True,
     ) -> InvoiceOutEntity:
@@ -72,6 +76,12 @@ class InvoiceOutService:
             f"agent=https://api.moysklad.ru/api/remap/1.2/entity/counterparty/{agent_id}",
             f"name={name}",
         ]
+
+        if organization_id:
+            filter_parts.append(
+                "organization=https://api.moysklad.ru/api/remap/1.2/entity/organization/"
+                f"{organization_id}"
+            )
 
         if moment:
             msk_tz = timezone(timedelta(hours=3)) 
@@ -106,6 +116,9 @@ class InvoiceOutService:
         org_href = org_meta.get("href", "")
         org_id = org_href.split("/")[-1] if org_href else ""
 
+        project_meta = data.get("project", {}).get("meta", {})
+        project_href = project_meta.get("href") if project_meta else None
+
         if not data.get("meta", {}).get("href"):
             raise InvoiceOutNotFoundError("Некорректные данные счета покупателю")
 
@@ -120,6 +133,7 @@ class InvoiceOutService:
             agent_id=agent_id,
             organization_id=org_id,
             meta_href=data["meta"]["href"],
+            project_meta_href=project_href,
         )
 
     async def update_state(self, invoice_id: str, state_id: str) -> InvoiceOutEntity:

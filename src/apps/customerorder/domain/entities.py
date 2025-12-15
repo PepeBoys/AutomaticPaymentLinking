@@ -21,6 +21,7 @@ class CustomerOrderEntity:
     agent_id: str
     organization_id: str
     meta_href: str
+    project_meta_href: Optional[str] = None
     
     def is_fully_paid(self) -> bool:
         """Проверить, полностью ли оплачен заказ."""

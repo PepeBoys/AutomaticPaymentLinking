@@ -52,6 +52,11 @@ class WebhookHandler:
                 document, linked_sum, linked_documents = await self._link_payment_by_counterparty(
                     payment=payment,
                     document_type=subscription.document_type,
+                    organization_id=(
+                        payment.organization_id
+                        if subscription.check_document_organization
+                        else None
+                    ),
                     prioritize_oldest=(
                         subscription.document_priority == DocumentPriority.oldest_first
                     ),
@@ -62,6 +67,11 @@ class WebhookHandler:
                     document_type=subscription.document_type,
                     link_type=subscription.link_type,
                     payment_purpose_mask=subscription.payment_purpose_mask,
+                    organization_id=(
+                        payment.organization_id
+                        if subscription.check_document_organization
+                        else None
+                    ),
                     prioritize_oldest=(
                         subscription.document_priority == DocumentPriority.oldest_first
                     ),
@@ -93,6 +103,12 @@ class WebhookHandler:
                     document_meta_href=document.meta_href,
                     linked_sum=payment.sum,
                 )
+
+            await self._apply_project_from_document(
+                payment_id=payment.id,
+                document=document,
+                transfer_project=subscription.transfer_project_to_payment,
+            )
 
             logger.info(
                 "✓ Платеж %s привязан к %s %s (сумма: %s)",
@@ -150,6 +166,7 @@ class WebhookHandler:
         document_type: DocumentType,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
+        organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
         """Найти подходящий документ по типу и стратегии."""
@@ -159,6 +176,7 @@ class WebhookHandler:
                 payment,
                 link_type,
                 payment_purpose_mask,
+                organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
 
@@ -167,6 +185,7 @@ class WebhookHandler:
                 payment,
                 link_type,
                 payment_purpose_mask,
+                organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
 
@@ -175,6 +194,7 @@ class WebhookHandler:
                 payment,
                 link_type,
                 payment_purpose_mask,
+                organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
 
@@ -184,6 +204,7 @@ class WebhookHandler:
         self,
         payment,
         document_type: DocumentType,
+        organization_id: str | None,
         prioritize_oldest: bool,
     ):
         """Привязать платеж по контрагенту к нескольким документам по очереди."""
@@ -191,6 +212,7 @@ class WebhookHandler:
         documents = await self._get_documents_by_counterparty(
             payment=payment,
             document_type=document_type,
+            organization_id=organization_id,
             prioritize_oldest=prioritize_oldest,
         )
 
@@ -243,6 +265,35 @@ class WebhookHandler:
         if payment_id and state_id:
             await self.paymentin_service.update_state(payment_id, state_id)
 
+    async def _apply_project_from_document(
+        self, payment_id: str, document, transfer_project: bool
+    ) -> None:
+        """Перенести проект из документа в платеж при необходимости."""
+
+        if not transfer_project:
+            return
+
+        project_href = getattr(document, "project_meta_href", None) if document else None
+
+        if not project_href:
+            logger.info(
+                "Проект не перенесен для платежа %s: у документа нет проекта",
+                payment_id,
+            )
+            return
+
+        try:
+            await self.paymentin_service.update_project(payment_id, project_href)
+            logger.info(
+                "✓ Проект перенесен в платеж %s из документа %s",
+                payment_id,
+                document.name if document else "",
+            )
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            logger.warning(
+                "Не удалось перенести проект в платеж %s: %s", payment_id, exc
+            )
+
     async def _apply_document_states(
         self,
         documents: list,
@@ -263,7 +314,11 @@ class WebhookHandler:
                 await self.demand_service.update_state(document.id, state_id)
 
     async def _get_documents_by_counterparty(
-        self, payment, document_type: DocumentType, prioritize_oldest: bool
+        self,
+        payment,
+        document_type: DocumentType,
+        organization_id: str | None,
+        prioritize_oldest: bool,
     ):
         """Получить список документов для привязки по контрагенту."""
 
@@ -272,6 +327,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=False,
+                organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
 
@@ -280,6 +336,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=False,
+                organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
 
@@ -288,6 +345,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=False,
+                organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
 
@@ -298,6 +356,7 @@ class WebhookHandler:
         payment,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
+        organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
         """Найти подходящий заказ в зависимости от стратегии."""
@@ -307,6 +366,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=True,
+                organization_id=organization_id,
             )
             return orders[0] if orders else None
 
@@ -315,6 +375,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=False,
+                organization_id=organization_id,
             )
             return orders[0] if orders else None
 
@@ -323,6 +384,7 @@ class WebhookHandler:
                 payment=payment,
                 document_type=DocumentType.customerorder,
                 payment_purpose_mask=payment_purpose_mask,
+                organization_id=organization_id,
             )
 
         return None
@@ -332,6 +394,7 @@ class WebhookHandler:
         payment,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
+        organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
         """Найти подходящий счет покупателю для платежа."""
@@ -341,6 +404,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=True,
+                organization_id=organization_id,
             )
             return invoices[0] if invoices else None
 
@@ -349,6 +413,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=False,
+                organization_id=organization_id,
             )
             return invoices[0] if invoices else None
 
@@ -357,6 +422,7 @@ class WebhookHandler:
                 payment=payment,
                 document_type=DocumentType.invoiceout,
                 payment_purpose_mask=payment_purpose_mask,
+                organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
 
@@ -367,6 +433,7 @@ class WebhookHandler:
         payment,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
+        organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
         """Найти подходящую отгрузку для платежа."""
@@ -376,6 +443,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=True,
+                organization_id=organization_id,
             )
             return demands[0] if demands else None
 
@@ -384,6 +452,7 @@ class WebhookHandler:
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=False,
+                organization_id=organization_id,
             )
             return demands[0] if demands else None
 
@@ -392,6 +461,7 @@ class WebhookHandler:
                 payment=payment,
                 document_type=DocumentType.demand,
                 payment_purpose_mask=payment_purpose_mask,
+                organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
 
@@ -402,6 +472,7 @@ class WebhookHandler:
         payment,
         document_type: DocumentType,
         payment_purpose_mask: str | None,
+        organization_id: str | None,
         prioritize_oldest: bool = True,
     ):
         """Найти документ по данным из назначения платежа."""
@@ -419,6 +490,7 @@ class WebhookHandler:
                 return await self.customerorder_service.find_by_name_and_agent(
                     name=name,
                     agent_id=payment.agent_id,
+                    organization_id=organization_id,
                     moment=moment,
                     prioritize_oldest=prioritize_oldest,
                 )
@@ -427,6 +499,7 @@ class WebhookHandler:
                 return await self.invoiceout_service.find_by_name_and_agent(
                     name=name,
                     agent_id=payment.agent_id,
+                    organization_id=organization_id,
                     moment=moment,
                     prioritize_oldest=prioritize_oldest,
                 )
@@ -435,6 +508,7 @@ class WebhookHandler:
                 return await self.demand_service.find_by_name_and_agent(
                     name=name,
                     agent_id=payment.agent_id,
+                    organization_id=organization_id,
                     moment=moment,
                     prioritize_oldest=prioritize_oldest,
                 )

@@ -75,7 +75,7 @@ async def update_link_settings(
     service: WebhookSvcDep,
 ):
     logger.info(
-        "Обновление настроек привязки: payment_type=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, doc_fail=%s",
+        "Обновление настроек привязки: payment_type=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, doc_fail=%s, transfer_project=%s, check_org=%s",
         payload.payment_type,
         payload.document_type,
         payload.link_type,
@@ -85,6 +85,8 @@ async def update_link_settings(
         payload.payment_status_on_failure,
         payload.document_status_on_success,
         payload.document_status_on_failure,
+        payload.transfer_project_to_payment,
+        payload.check_document_organization,
     )
 
     result = await service.update_link_settings(
@@ -97,6 +99,8 @@ async def update_link_settings(
         payment_status_on_failure=payload.payment_status_on_failure,
         document_status_on_success=payload.document_status_on_success,
         document_status_on_failure=payload.document_status_on_failure,
+        transfer_project_to_payment=payload.transfer_project_to_payment,
+        check_document_organization=payload.check_document_organization,
     )
 
     return result
@@ -105,7 +109,7 @@ async def update_link_settings(
 @router.post("/auto-link-toggle")
 async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDep):
     logger.info(
-        "UI toggle: payment_type=%s, enabled=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, doc_fail=%s",
+        "UI toggle: payment_type=%s, enabled=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, doc_fail=%s, transfer_project=%s, check_org=%s",
         payload.payment_type,
         payload.enabled,
         payload.document_type,
@@ -116,6 +120,8 @@ async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDe
         payload.payment_status_on_failure,
         payload.document_status_on_success,
         payload.document_status_on_failure,
+        payload.transfer_project_to_payment,
+        payload.check_document_organization,
     )
 
     result = await service.toggle_webhook(
@@ -129,6 +135,8 @@ async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDe
         payment_status_on_failure=payload.payment_status_on_failure,
         document_status_on_success=payload.document_status_on_success,
         document_status_on_failure=payload.document_status_on_failure,
+        transfer_project_to_payment=payload.transfer_project_to_payment,
+        check_document_organization=payload.check_document_organization,
     )
    
     if result.is_skipped():

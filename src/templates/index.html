@@ -182,6 +182,8 @@
             const checkbox = tab.querySelector('.js-auto-link-toggle');
             const maskInput = tab.querySelector('.js-payment-purpose-mask');
             const statusSelects = tab.querySelectorAll('select');
+            const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+            const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
 
             documentRadios.forEach(radio => radio.disabled = disabled);
             linkRadios.forEach(radio => radio.disabled = disabled);
@@ -189,6 +191,8 @@
             if (checkbox) checkbox.disabled = disabled;
             if (maskInput) maskInput.disabled = disabled;
             statusSelects.forEach(select => select.disabled = disabled);
+            if (transferProjectCheckbox) transferProjectCheckbox.disabled = disabled;
+            if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = disabled;
         }
 
         function toggleMaskVisibility(paymentType) {
@@ -215,6 +219,8 @@
             const paymentFailureSelect = tab.querySelector('.js-payment-failure-status');
             const documentSuccessSelect = tab.querySelector('.js-document-success-status');
             const documentFailureSelect = tab.querySelector('.js-document-failure-status');
+            const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+            const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
 
             return {
                 document_type: documentTypeRadio ? documentTypeRadio.value : 'customerorder',
@@ -225,6 +231,8 @@
                 payment_status_on_failure: paymentFailureSelect ? paymentFailureSelect.value || null : null,
                 document_status_on_success: documentSuccessSelect ? documentSuccessSelect.value || null : null,
                 document_status_on_failure: documentFailureSelect ? documentFailureSelect.value || null : null,
+                transfer_project_to_payment: transferProjectCheckbox ? transferProjectCheckbox.checked : false,
+                check_document_organization: checkOrganizationCheckbox ? checkOrganizationCheckbox.checked : false,
             };
         }
 
@@ -244,6 +252,18 @@
             const maskInput = tab.querySelector('.js-payment-purpose-mask');
             if (maskInput && paymentPurposeMask !== undefined) {
                 maskInput.value = paymentPurposeMask || '';
+            }
+
+            const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+            const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
+            if (transferProjectCheckbox) {
+                const cachedValue = webhookStatusCache[paymentType]?.transfer_project_to_payment;
+                transferProjectCheckbox.checked = Boolean(cachedValue);
+            }
+
+            if (checkOrganizationCheckbox) {
+                const cachedOrgCheck = webhookStatusCache[paymentType]?.check_document_organization;
+                checkOrganizationCheckbox.checked = Boolean(cachedOrgCheck);
             }
 
             toggleMaskVisibility(paymentType);
@@ -414,6 +434,8 @@
                     payment_status_on_failure: settings.payment_status_on_failure,
                     document_status_on_success: settings.document_status_on_success,
                     document_status_on_failure: settings.document_status_on_failure,
+                    transfer_project_to_payment: settings.transfer_project_to_payment,
+                    check_document_organization: settings.check_document_organization,
                 })
             })
             .then(response => response.json())
@@ -465,6 +487,8 @@
                     payment_status_on_failure: settings.payment_status_on_failure,
                     document_status_on_success: settings.document_status_on_success,
                     document_status_on_failure: settings.document_status_on_failure,
+                    transfer_project_to_payment: settings.transfer_project_to_payment,
+                    check_document_organization: settings.check_document_organization,
                 })
             })
             .then(response => response.json())
@@ -539,6 +563,34 @@
             }, 600, `mask_${paymentType}`);
 
             input.addEventListener('input', debouncedMaskUpdate);
+        });
+
+        document.querySelectorAll('.js-transfer-project').forEach((transferCheckbox) => {
+            const paymentType = transferCheckbox.dataset.paymentType;
+
+            const debouncedTransferUpdate = debounce(function() {
+                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
+
+                if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
+                    updateLinkSettings(paymentType);
+                }
+            }, 300, `transfer_${paymentType}`);
+
+            transferCheckbox.addEventListener('change', debouncedTransferUpdate);
+        });
+
+        document.querySelectorAll('.js-check-organization').forEach((orgCheckbox) => {
+            const paymentType = orgCheckbox.dataset.paymentType;
+
+            const debouncedOrgUpdate = debounce(function() {
+                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
+
+                if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
+                    updateLinkSettings(paymentType);
+                }
+            }, 300, `check_org_${paymentType}`);
+
+            orgCheckbox.addEventListener('change', debouncedOrgUpdate);
         });
 
         setTimeout(() => {

@@ -171,3 +171,40 @@ class PaymentInClient:
                 "Ошибка при обновлении статуса платежа",
                 details={"error": str(exc)},
             ) from exc
+
+    async def update_project(self, payment_id: str, project_href: str) -> Dict[str, Any]:
+        """Обновить проект входящего платежа."""
+
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/paymentin/{payment_id}"
+                logger.debug(
+                    "Обновление проекта платежа: %s -> %s", payment_id, project_href
+                )
+
+                payload = {
+                    "project": {
+                        "meta": {
+                            "href": project_href,
+                            "type": "project",
+                            "mediaType": "application/json",
+                        }
+                    }
+                }
+
+                resp = await client.put(url, json=payload)
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            raise PaymentInAPIError(
+                "Ошибка HTTP при обновлении проекта платежа",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            raise PaymentInAPIError(
+                "Ошибка при обновлении проекта платежа",
+                details={"error": str(exc)},
+            ) from exc
