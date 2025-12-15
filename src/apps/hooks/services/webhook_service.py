@@ -291,9 +291,14 @@ class WebhookService:
         payload,
         paymentin_service,
         cashin_service,
+        paymentout_service,
+        cashout_service,
         customerorder_service,
         invoiceout_service,
         demand_service=None,
+        purchaseorder_service=None,
+        invoicein_service=None,
+        supply_service=None,
     ) -> None:
         """
         Обработать входящий webhook от МойСклад.
@@ -317,12 +322,32 @@ class WebhookService:
         if cashin_service is None:
             raise ValueError("CashInService dependency is required")
 
+        if paymentout_service is None:
+            raise ValueError("PaymentOutService dependency is required")
+
+        if cashout_service is None:
+            raise ValueError("CashOutService dependency is required")
+
+        if purchaseorder_service is None:
+            raise ValueError("PurchaseOrderService dependency is required")
+
+        if invoicein_service is None:
+            raise ValueError("InvoiceInService dependency is required")
+
+        if supply_service is None:
+            raise ValueError("SupplyService dependency is required")
+
         handler = WebhookHandler(
             paymentin_service,
             cashin_service,
+            paymentout_service,
+            cashout_service,
             customerorder_service,
             invoiceout_service,
             demand_service,
+            purchaseorder_service,
+            invoicein_service,
+            supply_service,
         )
         
         for event in payload.events:
@@ -358,6 +383,50 @@ class WebhookService:
                     result = await handler.handle_cashin_create(event.meta.href, subscription)
                     logger.info(
                         "Результат обработки приходного ордера: success=%s, message=%s",
+                        result["success"],
+                        result["message"],
+                    )
+                else:
+                    logger.warning(
+                        "Активная подписка не найдена для аккаунта %s и типа %s",
+                        event.accountId,
+                        event.meta.type,
+                    )
+            elif event.meta.type == "paymentout" and event.action == "CREATE":
+                subscription = await self._uow.webhooks.get_active_subscription_for_event(
+                    account_id=event.accountId,
+                    entity_type=event.meta.type,
+                    payment_type=PaymentType.outgoing_payment,
+                )
+
+                if subscription:
+                    result = await handler.handle_paymentout_create(
+                        event.meta.href, subscription
+                    )
+                    logger.info(
+                        "Результат обработки исходящего платежа: success=%s, message=%s",
+                        result["success"],
+                        result["message"],
+                    )
+                else:
+                    logger.warning(
+                        "Активная подписка не найдена для аккаунта %s и типа %s",
+                        event.accountId,
+                        event.meta.type,
+                    )
+            elif event.meta.type == "cashout" and event.action == "CREATE":
+                subscription = await self._uow.webhooks.get_active_subscription_for_event(
+                    account_id=event.accountId,
+                    entity_type=event.meta.type,
+                    payment_type=PaymentType.outgoing_order,
+                )
+
+                if subscription:
+                    result = await handler.handle_cashout_create(
+                        event.meta.href, subscription
+                    )
+                    logger.info(
+                        "Результат обработки расходного ордера: success=%s, message=%s",
                         result["success"],
                         result["message"],
                     )

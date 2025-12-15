@@ -10,40 +10,34 @@
         </div>
 
         <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-            <label class="radio option" style="margin-bottom: 0;">
-                <input
-                    class="radio__input js-document-type"
-                    type="radio"
-                    name="document_type_{{ payment_type }}"
-                    value="customerorder"
-                    data-payment-type="{{ payment_type }}"
-                    checked
-                >
-                <span class="radio__box"></span>
-                <span class="radio__text">Заказ покупателя</span>
-            </label>
-            <label class="radio option" style="margin-bottom: 0;">
-                <input
-                    class="radio__input js-document-type"
-                    type="radio"
-                    name="document_type_{{ payment_type }}"
-                    value="invoiceout"
-                    data-payment-type="{{ payment_type }}"
-                >
-                <span class="radio__box"></span>
-                <span class="radio__text">Счет</span>
-            </label>
-            <label class="radio option" style="margin-bottom: 0;">
-                <input
-                    class="radio__input js-document-type"
-                    type="radio"
-                    name="document_type_{{ payment_type }}"
-                    value="demand"
-                    data-payment-type="{{ payment_type }}"
-                >
-                <span class="radio__box"></span>
-                <span class="radio__text">Отгрузка</span>
-            </label>
+            {% set document_options = [
+                {"value": "customerorder", "label": "Заказ покупателя"},
+                {"value": "invoiceout", "label": "Счет"},
+                {"value": "demand", "label": "Отгрузка"},
+            ] %}
+
+            {% if payment_type in ["outgoing_payment", "outgoing_order"] %}
+                {% set document_options = [
+                    {"value": "purchaseorder", "label": "Заказ поставщика"},
+                    {"value": "invoicein", "label": "Счет поставщика"},
+                    {"value": "supply", "label": "Приемка"},
+                ] %}
+            {% endif %}
+
+            {% for option in document_options %}
+                <label class="radio option" style="margin-bottom: 0;">
+                    <input
+                        class="radio__input js-document-type"
+                        type="radio"
+                        name="document_type_{{ payment_type }}"
+                        value="{{ option.value }}"
+                        data-payment-type="{{ payment_type }}"
+                        {% if loop.first %}checked{% endif %}
+                    >
+                    <span class="radio__box"></span>
+                    <span class="radio__text">{{ option.label }}</span>
+                </label>
+            {% endfor %}
         </div>
     </div>
 
@@ -151,7 +145,7 @@
         </div>
     </div>
 
-    {% if payment_type in ["incoming_payment", "incoming_order"] %}
+    {% if payment_type in ["incoming_payment", "incoming_order", "outgoing_payment", "outgoing_order"] %}
     <!-- Дополнительные опции -->
     <div class="settings-section" style="padding-top: 20px; border-top: 1px solid #e5e7eb;">
         <div class="section-title">Дополнительные опции</div>
@@ -200,7 +194,7 @@
                 <div class="js-payment-failure-status-container" data-payment-type="{{ payment_type }}"></div>
             </div>
             <div class="caption js-payment-status-hint" style="color: #ef4444; margin-top: 6px; font-size: 11px; display: none;">
-                ⚠ В МойСклад нет статусов для входящего платежа
+                ⚠ В МойСклад нет статусов для этого платежа
             </div>
         </div>
         

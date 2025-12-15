@@ -16,6 +16,9 @@ class DocumentType(str, Enum):
     customerorder = "customerorder"  # Заказ покупателя
     invoiceout = "invoiceout"        # Счет покупателя
     demand = "demand"                # Отгрузка
+    purchaseorder = "purchaseorder"  # Заказ поставщика
+    invoicein = "invoicein"          # Счет поставщика
+    supply = "supply"                # Приемка
 
 
 class LinkType(str, Enum):
