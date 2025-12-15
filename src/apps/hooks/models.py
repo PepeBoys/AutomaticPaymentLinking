@@ -46,6 +46,11 @@ class WebhookSubscription(Base):
         server_default="oldest_first",
     )
 
+    payment_purpose_mask = Column(
+        String(512), 
+        nullable=True,
+    )
+
     __table_args__ = (
         Index(
             "ix_webhook_payment_enabled",

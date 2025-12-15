@@ -1,6 +1,7 @@
 from asyncio import current_task
 from typing import AsyncGenerator
 
+from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_scoped_session,
@@ -13,7 +14,7 @@ from .config import settings
 
 class DatabaseManager:
     """Менеджер для управления подключением к БД и сессиями."""
-    
+
     def __init__(self, url: str, echo: bool = False) -> None:
         self.engine = create_async_engine(
             url=url,
@@ -34,13 +35,13 @@ class DatabaseManager:
             session_factory=self.session_factory,
             scopefunc=current_task,
         )
-    
+
     async def session_dependency(self) -> AsyncGenerator[AsyncSession, None]:
         """Dependency для получения обычной сессии."""
         async with self.session_factory() as session:
             yield session
             await session.close()
-    
+
     async def scope_session_dependency(self) -> AsyncGenerator[AsyncSession, None]:
         """Dependency для получения scoped сессии."""
         session = self.get_scope_session()
@@ -67,6 +68,21 @@ async def init_db() -> None:
     import src.apps.hooks.models
 
     from .models import Base
-    
+
     async with db_manager.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_apply_manual_migrations)
+
+
+def _apply_manual_migrations(sync_conn) -> None:
+    """Простые ручные миграции для поддержания схемы."""
+
+    inspector = inspect(sync_conn)
+
+    if "webhooksubscriptions" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("webhooksubscriptions")}
+        if "payment_purpose_mask" not in columns:
+            sync_conn.exec_driver_sql(
+                "ALTER TABLE webhooksubscriptions "
+                "ADD COLUMN payment_purpose_mask VARCHAR(512)"
+            )

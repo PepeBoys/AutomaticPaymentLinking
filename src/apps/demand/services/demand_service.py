@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 
 from ...ms_auth.services.auth_service import MySkladAuthService
 from ..domain.entities import DemandEntity
@@ -54,6 +54,34 @@ class DemandService:
         )
 
         return entities
+    
+    async def find_by_name_and_agent(
+        self, name: str, agent_id: str, moment: Optional[datetime] = None
+    ) -> DemandEntity:
+        """Найти отгрузку по номеру и контрагенту."""
+
+        filter_parts = [
+            f"agent=https://api.moysklad.ru/api/remap/1.2/entity/counterparty/{agent_id}",
+            f"name={name}",
+        ]
+
+        if moment:
+            start = moment.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = moment.replace(hour=23, minute=59, second=59, microsecond=999999)
+            filter_parts.append(f"moment>={start.isoformat()}")
+            filter_parts.append(f"moment<={end.isoformat()}")
+
+        demands_data = await self._client.search(
+            filter_str=";".join(filter_parts),
+            limit=1,
+        )
+
+        if not demands_data:
+            raise DemandNotFoundError(
+                f"Отгрузка с номером '{name}' для контрагента {agent_id} не найдена"
+            )
+
+        return self._to_entity(demands_data[0])
 
     @staticmethod
     def _to_entity(data: dict) -> DemandEntity:

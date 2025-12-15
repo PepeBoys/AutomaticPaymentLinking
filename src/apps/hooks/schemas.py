@@ -35,6 +35,7 @@ class AutoLinkTogglePayload(BaseModel):
     document_type: Optional[DocumentType] = DocumentType.customerorder
     link_type: Optional[LinkType] = LinkType.sum_and_counterparty
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
+    payment_purpose_mask: Optional[str] = None
 
 
 class UpdateLinkSettingsPayload(BaseModel):
@@ -42,6 +43,7 @@ class UpdateLinkSettingsPayload(BaseModel):
     document_type: DocumentType
     link_type: LinkType
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
+    payment_purpose_mask: Optional[str] = None
 
 
 class WebhookStatusItem(BaseModel):
@@ -49,6 +51,7 @@ class WebhookStatusItem(BaseModel):
     document_type: DocumentType
     link_type: LinkType
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
+    payment_purpose_mask: Optional[str] = None
 
 
 class WebhookStatusResponse(BaseModel):

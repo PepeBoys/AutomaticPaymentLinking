@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 
 from ...ms_auth.services.auth_service import MySkladAuthService
 from ..domain.entities import InvoiceOutEntity
@@ -53,6 +53,34 @@ class InvoiceOutService:
         )
 
         return entities
+    
+    async def find_by_name_and_agent(
+        self, name: str, agent_id: str, moment: Optional[datetime] = None
+    ) -> InvoiceOutEntity:
+        """Найти счет покупателю по номеру и контрагенту."""
+
+        filter_parts = [
+            f"agent=https://api.moysklad.ru/api/remap/1.2/entity/counterparty/{agent_id}",
+            f"name={name}",
+        ]
+
+        if moment:
+            start = moment.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = moment.replace(hour=23, minute=59, second=59, microsecond=999999)
+            filter_parts.append(f"moment>={start.isoformat()}")
+            filter_parts.append(f"moment<={end.isoformat()}")
+
+        invoices_data = await self._client.search(
+            filter_str=";".join(filter_parts),
+            limit=1,
+        )
+
+        if not invoices_data:
+            raise InvoiceOutNotFoundError(
+                f"Счет с номером '{name}' для контрагента {agent_id} не найден"
+            )
+
+        return self._to_entity(invoices_data[0])
 
     @staticmethod
     def _to_entity(data: dict) -> InvoiceOutEntity:

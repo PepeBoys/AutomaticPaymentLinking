@@ -142,11 +142,25 @@
             const linkRadios = tab.querySelectorAll('.js-link-type');
             const priorityRadios = tab.querySelectorAll('.js-document-priority');
             const checkbox = tab.querySelector('.js-auto-link-toggle');
+            const maskInput = tab.querySelector('.js-payment-purpose-mask');
 
             documentRadios.forEach(radio => radio.disabled = disabled);
             linkRadios.forEach(radio => radio.disabled = disabled);
             priorityRadios.forEach(radio => radio.disabled = disabled);
             if (checkbox) checkbox.disabled = disabled;
+            if (maskInput) maskInput.disabled = disabled;
+        }
+
+        function toggleMaskVisibility(paymentType) {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+            if (!tab) return;
+
+            const selectedLinkType = tab.querySelector('.js-link-type:checked')?.value;
+            const maskContainer = tab.querySelector('.js-mask-container');
+
+            if (!maskContainer) return;
+
+            maskContainer.style.display = selectedLinkType === 'payment_purpose_mask' ? 'block' : 'none';
         }
 
         function getTabSettings(paymentType) {
@@ -156,15 +170,17 @@
             const documentTypeRadio = tab.querySelector('.js-document-type:checked');
             const linkTypeRadio = tab.querySelector('.js-link-type:checked');
             const documentPriorityRadio = tab.querySelector('.js-document-priority:checked');
+            const maskInput = tab.querySelector('.js-payment-purpose-mask');
 
             return {
                 document_type: documentTypeRadio ? documentTypeRadio.value : 'customerorder',
                 link_type: linkTypeRadio ? linkTypeRadio.value : 'sum_and_counterparty',
-                document_priority: documentPriorityRadio ? documentPriorityRadio.value : 'oldest_first'
+                document_priority: documentPriorityRadio ? documentPriorityRadio.value : 'oldest_first',
+                payment_purpose_mask: maskInput ? maskInput.value.trim() : null,
             };
         }
 
-        function setTabSettings(paymentType, documentType, linkType, documentPriority) {
+        function setTabSettings(paymentType, documentType, linkType, documentPriority, paymentPurposeMask) {
             const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
             if (!tab) return;
 
@@ -176,6 +192,13 @@
 
             const priorityRadio = tab.querySelector(`.js-document-priority[value="${documentPriority || 'oldest_first'}"]`);
             if (priorityRadio) priorityRadio.checked = true;
+
+            const maskInput = tab.querySelector('.js-payment-purpose-mask');
+            if (maskInput && paymentPurposeMask !== undefined) {
+                maskInput.value = paymentPurposeMask || '';
+            }
+
+            toggleMaskVisibility(paymentType);
         }
 
         function loadWebhookStatus() {
@@ -204,7 +227,8 @@
                                 paymentType,
                                 webhookData.document_type,
                                 webhookData.link_type,
-                                documentPriority
+                                documentPriority,
+                                webhookData.payment_purpose_mask
                             );
                             
                             console.log(`${paymentType}: enabled=${webhookData.enabled}, document_type=${webhookData.document_type}, link_type=${webhookData.link_type}, priority=${documentPriority}`);
@@ -243,7 +267,8 @@
                     payment_type: paymentType,
                     document_type: settings.document_type,
                     link_type: settings.link_type,
-                    document_priority: settings.document_priority
+                    document_priority: settings.document_priority,
+                    payment_purpose_mask: settings.payment_purpose_mask,
                 })
             })
             .then(response => {
@@ -294,7 +319,8 @@
                     enabled: enabled,
                     document_type: settings.document_type,
                     link_type: settings.link_type,
-                    document_priority: settings.document_priority
+                    document_priority: settings.document_priority,
+                    payment_purpose_mask: settings.payment_purpose_mask,
                 })
             })
             .then(response => {
@@ -330,7 +356,7 @@
 
         document.querySelectorAll('.js-document-type, .js-link-type, .js-document-priority').forEach((radio) => {
             const paymentType = radio.dataset.paymentType;
-            
+
             const debouncedUpdate = debounce(function() {
                 const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
                 
@@ -340,6 +366,28 @@
             }, 500, `radio_${paymentType}`);
             
             radio.addEventListener("change", debouncedUpdate);
+            radio.addEventListener("change", () => toggleMaskVisibility(paymentType));
+        });
+
+        document.querySelectorAll('.js-payment-purpose-mask').forEach((input) => {
+            const paymentType = input.dataset.paymentType;
+
+            const debouncedMaskUpdate = debounce(function() {
+                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
+                const linkTypeRadio = document.querySelector(`.js-link-type:checked[data-payment-type="${paymentType}"]`);
+
+                if (
+                    checkbox &&
+                    checkbox.checked &&
+                    linkTypeRadio &&
+                    linkTypeRadio.value === 'payment_purpose_mask' &&
+                    !processingFlags[paymentType]
+                ) {
+                    updateLinkSettings(paymentType);
+                }
+            }, 600, `mask_${paymentType}`);
+
+            input.addEventListener('input', debouncedMaskUpdate);
         });
 
         loadWebhookStatus();

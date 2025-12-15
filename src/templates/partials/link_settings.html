@@ -79,6 +79,25 @@
         </label>
     </div>
 
+    <div
+        class="payment-purpose-mask js-mask-container"
+        data-payment-type="{{ payment_type }}"
+        style="display: none; margin-top: 12px;"
+    >
+        <div class="caption" style="margin-bottom: 8px;">Маска назначения платежа:</div>
+        <input
+            class="textfield js-payment-purpose-mask"
+            type="text"
+            name="payment_purpose_mask_{{ payment_type }}"
+            data-payment-type="{{ payment_type }}"
+            placeholder="Оплата по акту №$name от $moment за услуги..."
+            style="width: 100%;"
+        >
+        <div class="caption" style="margin-top: 6px; color: #6b7280;">
+            Используйте переменные <code>$name</code> и <code>$moment</code> (ДД.ММ.ГГГГ).
+        </div>
+    </div>
+
     <div style="margin-top: 16px;">
         <div class="caption" style="margin-bottom: 8px;">Приоритет документов:</div>
         <label class="radio option">

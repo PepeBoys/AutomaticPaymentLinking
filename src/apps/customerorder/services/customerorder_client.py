@@ -161,11 +161,11 @@ class CustomerOrderClient:
             async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
                 url = f"{base_url}/entity/customerorder"
                 logger.debug("Поиск заказов с фильтром: %s", filter_str)
-                
+
                 resp = await client.get(url, params=params)
                 resp.raise_for_status()
                 data = resp.json()
-                
+
                 rows = data.get("rows", [])
                 logger.debug("Найдено заказов: %d", len(rows))
                 return rows

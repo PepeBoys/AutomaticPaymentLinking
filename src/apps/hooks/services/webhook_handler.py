@@ -2,6 +2,7 @@
 
 import logging
 import re
+from datetime import datetime
 
 from ...customerorder.exceptions import CustomerOrderNotFoundError
 from ...customerorder.services.customerorder_service import CustomerOrderService
@@ -32,7 +33,6 @@ class WebhookHandler:
         self.invoiceout_service = invoiceout_service
         self.demand_service = demand_service
 
-
     async def handle_paymentin_create(
         self, event_href: str, subscription: WebhookEntity
     ) -> dict:
@@ -60,6 +60,7 @@ class WebhookHandler:
                     payment=payment,
                     document_type=subscription.document_type,
                     link_type=subscription.link_type,
+                    payment_purpose_mask=subscription.payment_purpose_mask,
                 )
                 linked_sum = payment.sum if document else 0
 
@@ -91,7 +92,7 @@ class WebhookHandler:
                 document.name,
                 payment.sum,
             )
-            
+
             response = {
                 "success": True,
                 "message": (
@@ -106,7 +107,7 @@ class WebhookHandler:
                 response["order_id"] = document.id
 
             return response
-        
+
         except PaymentInNotFoundError as exc:
             logger.warning("Платеж по ссылке %s не найден: %s", event_href, exc)
             return {"success": False, "message": "Платеж не найден в МойСклад"}
@@ -122,18 +123,28 @@ class WebhookHandler:
             raise
 
     async def _find_document_for_payment(
-        self, payment, document_type: DocumentType, link_type: LinkType
+        self,
+        payment,
+        document_type: DocumentType,
+        link_type: LinkType,
+        payment_purpose_mask: str | None = None,
     ):
         """Найти подходящий документ по типу и стратегии."""
 
         if document_type == DocumentType.customerorder:
-            return await self._find_order_for_payment(payment, link_type)
+            return await self._find_order_for_payment(
+                payment, link_type, payment_purpose_mask
+            )
 
         if document_type == DocumentType.invoiceout:
-            return await self._find_invoice_for_payment(payment, link_type)
+            return await self._find_invoice_for_payment(
+                payment, link_type, payment_purpose_mask
+            )
 
         if document_type == DocumentType.demand:
-            return await self._find_demand_for_payment(payment, link_type)
+            return await self._find_demand_for_payment(
+                payment, link_type, payment_purpose_mask
+            )
 
         return None
 
@@ -223,7 +234,9 @@ class WebhookHandler:
 
         return []
 
-    async def _find_order_for_payment(self, payment, link_type: LinkType):
+    async def _find_order_for_payment(
+        self, payment, link_type: LinkType, payment_purpose_mask: str | None = None
+    ):
         """Найти подходящий заказ в зависимости от стратегии."""
 
         if link_type == LinkType.sum_and_counterparty:
@@ -233,7 +246,7 @@ class WebhookHandler:
                 search_by_sum=True,
             )
             return orders[0] if orders else None
-        
+
         elif link_type == LinkType.counterparty:
             orders = await self.customerorder_service.find_for_payment(
                 agent_id=payment.agent_id,
@@ -241,13 +254,19 @@ class WebhookHandler:
                 search_by_sum=False,
             )
             return orders[0] if orders else None
-        
+
         elif link_type == LinkType.payment_purpose_mask:
-            return await self._find_order_by_purpose_mask(payment)
+            return await self._find_document_by_purpose_mask(
+                payment=payment,
+                document_type=DocumentType.customerorder,
+                payment_purpose_mask=payment_purpose_mask,
+            )
 
         return None
 
-    async def _find_invoice_for_payment(self, payment, link_type: LinkType):
+    async def _find_invoice_for_payment(
+        self, payment, link_type: LinkType, payment_purpose_mask: str | None = None
+    ):
         """Найти подходящий счет покупателю для платежа."""
 
         if link_type == LinkType.sum_and_counterparty:
@@ -266,9 +285,18 @@ class WebhookHandler:
             )
             return invoices[0] if invoices else None
 
+        if link_type == LinkType.payment_purpose_mask:
+            return await self._find_document_by_purpose_mask(
+                payment=payment,
+                document_type=DocumentType.invoiceout,
+                payment_purpose_mask=payment_purpose_mask,
+            )
+
         return None
 
-    async def _find_demand_for_payment(self, payment, link_type: LinkType):
+    async def _find_demand_for_payment(
+        self, payment, link_type: LinkType, payment_purpose_mask: str | None = None
+    ):
         """Найти подходящую отгрузку для платежа."""
 
         if link_type == LinkType.sum_and_counterparty:
@@ -287,33 +315,108 @@ class WebhookHandler:
             )
             return demands[0] if demands else None
 
+        if link_type == LinkType.payment_purpose_mask:
+            return await self._find_document_by_purpose_mask(
+                payment=payment,
+                document_type=DocumentType.demand,
+                payment_purpose_mask=payment_purpose_mask,
+            )
+
         return None
 
-    async def _find_order_by_purpose_mask(self, payment):
-        """Найти заказ по номеру из назначения платежа."""
-        if not payment.payment_purpose:
+    async def _find_document_by_purpose_mask(
+        self,
+        payment,
+        document_type: DocumentType,
+        payment_purpose_mask: str | None,
+    ):
+        """Найти документ по данным из назначения платежа."""
+
+        name, moment = self._extract_details_from_purpose(
+            payment_purpose=payment.payment_purpose,
+            payment_purpose_mask=payment_purpose_mask,
+        )
+
+        if not name:
             return None
+
+        try:
+            if document_type == DocumentType.customerorder:
+                return await self.customerorder_service.find_by_name_and_agent(
+                    name=name,
+                    agent_id=payment.agent_id,
+                    moment=moment,
+                )
+
+            if document_type == DocumentType.invoiceout:
+                return await self.invoiceout_service.find_by_name_and_agent(
+                    name=name,
+                    agent_id=payment.agent_id,
+                    moment=moment,
+                )
+
+            if document_type == DocumentType.demand:
+                return await self.demand_service.find_by_name_and_agent(
+                    name=name,
+                    agent_id=payment.agent_id,
+                    moment=moment,
+                )
+        except (CustomerOrderNotFoundError, InvoiceOutNotFoundError, DemandNotFoundError):
+            return None
+
+        return None
+
+    def _extract_details_from_purpose(
+        self, payment_purpose: str | None, payment_purpose_mask: str | None
+    ):
+        if not payment_purpose:
+            return None, None
+
+        if payment_purpose_mask:
+            regex = self._build_mask_regex(payment_purpose_mask)
+            match = regex.search(payment_purpose)
+            if match:
+                name = match.groupdict().get("name")
+                moment_str = match.groupdict().get("moment")
+                moment = self._parse_moment(moment_str) if moment_str else None
+                return name.strip() if name else None, moment
 
         patterns = [
             r"(?:заказ|order|№)\s*(\d+)",
             r"\b(\d{5,})\b",
         ]
 
-        order_number = None
         for pattern in patterns:
-            match = re.search(pattern, payment.payment_purpose, re.IGNORECASE)
+            match = re.search(pattern, payment_purpose, re.IGNORECASE)
             if match:
-                order_number = match.group(1)
-                break
+                return match.group(1), None
 
-        if not order_number:
-            logger.warning("Не удалось извлечь номер заказа из: '%s'", payment.payment_purpose)
+        logger.warning(
+            "Не удалось извлечь данные из назначения платежа: '%s'", payment_purpose
+        )
+        return None, None
+
+    @staticmethod
+    def _build_mask_regex(payment_purpose_mask: str) -> re.Pattern:
+        escaped = re.escape(payment_purpose_mask)
+
+        escaped = escaped.replace(r"\$name", r"(?P<name>.+?)")
+        escaped = escaped.replace(r"\$moment", r"(?P<moment>\d{2}\.\d{2}\.\d{4})")
+
+        escaped = escaped.replace(r"\ ", r"\s+")
+
+        return re.compile(escaped, re.IGNORECASE)
+
+    @staticmethod
+    def _parse_moment(moment_str: str | None) -> datetime | None:
+        if not moment_str:
             return None
 
-        try:
-            return await self.customerorder_service.find_by_name_and_agent(
-                name=order_number,
-                agent_id=payment.agent_id
-            )
-        except CustomerOrderNotFoundError:
-            return None
+        for fmt in ("%d.%m.%Y", "%d.%m.%y", "%d-%m-%Y", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(moment_str, fmt)
+            except ValueError:
+                pass
+
+        logger.warning("Не удалось распарсить дату '%s' из назначения платежа", moment_str)
+        return None

@@ -63,6 +63,7 @@ class WebhookService:
                 document_type=DocumentType(data["document_type"]),
                 link_type=LinkType(data["link_type"]),
                 document_priority=DocumentPriority(data["document_priority"]),
+                payment_purpose_mask=data.get("payment_purpose_mask"),
             )
         
         logger.debug("Статус вебхуков: %s", result)
@@ -74,6 +75,7 @@ class WebhookService:
         document_type: DocumentType,
         link_type: LinkType,
         document_priority: DocumentPriority,
+        payment_purpose_mask: str | None,
     ) -> Dict[str, str]:
         """
         Обновить настройки привязки БЕЗ обращения к МойСклад API.
@@ -91,6 +93,7 @@ class WebhookService:
             document_type=document_type,
             link_type=link_type,
             document_priority=document_priority,
+            payment_purpose_mask=payment_purpose_mask,
         )
 
         if not updated:
@@ -118,6 +121,7 @@ class WebhookService:
             "document_type": document_type.value,
             "link_type": link_type.value,
             "document_priority": document_priority.value,
+            "payment_purpose_mask": payment_purpose_mask,
         }
     
     async def toggle_webhook(
@@ -127,6 +131,7 @@ class WebhookService:
         document_type: DocumentType = DocumentType.customerorder,
         link_type: LinkType = LinkType.sum_and_counterparty,
         document_priority: DocumentPriority = DocumentPriority.oldest_first,
+        payment_purpose_mask: str | None = None,
     ) -> WebhookOperationResult:
         webhook_url = settings.ms_webhook_url
         
@@ -179,6 +184,7 @@ class WebhookService:
                 result.webhook_entity.document_type = document_type
                 result.webhook_entity.link_type = link_type
                 result.webhook_entity.document_priority = document_priority
+                result.webhook_entity.payment_purpose_mask = payment_purpose_mask
                 saved_entity = await self._uow.webhooks.upsert(result.webhook_entity)
                 await self._uow.commit()
                 
@@ -206,6 +212,7 @@ class WebhookService:
                     existing_db_entity.document_type = document_type
                     existing_db_entity.link_type = link_type
                     existing_db_entity.document_priority = document_priority
+                    existing_db_entity.payment_purpose_mask = payment_purpose_mask
                     saved_entity = await self._uow.webhooks.update(existing_db_entity)
                     await self._uow.commit()
                     

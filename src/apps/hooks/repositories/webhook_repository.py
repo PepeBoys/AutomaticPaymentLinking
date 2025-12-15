@@ -124,6 +124,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         document_type: DocumentType,
         link_type: LinkType,
         document_priority: DocumentPriority,
+        payment_purpose_mask: str | None,
     ) -> Optional[WebhookEntity]:
         """
         Обновить настройки привязки для существующего вебхука.
@@ -149,6 +150,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         model.document_type = document_type
         model.link_type = link_type
         model.document_priority = document_priority
+        model.payment_purpose_mask = payment_purpose_mask
         
         await self._session.flush()
         await self._session.refresh(model)
@@ -194,6 +196,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "document_type": model.document_type.value,
                     "link_type": model.link_type.value,
                     "document_priority": model.document_priority.value,
+                    "payment_purpose_mask": model.payment_purpose_mask,
                 }
             else:
                 result[pt.value] = {
@@ -201,6 +204,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "document_type": DocumentType.customerorder.value,
                     "link_type": LinkType.sum_and_counterparty.value,
                     "document_priority": DocumentPriority.oldest_first.value,
+                    "payment_purpose_mask": None,
                 }
         
         return result
@@ -343,6 +347,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             document_type=model.document_type,
             link_type=model.link_type,
             document_priority=model.document_priority,
+            payment_purpose_mask=model.payment_purpose_mask,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -371,4 +376,5 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             document_type=entity.document_type,
             link_type=entity.link_type,
             document_priority=entity.document_priority,
+            payment_purpose_mask=entity.payment_purpose_mask,
         )

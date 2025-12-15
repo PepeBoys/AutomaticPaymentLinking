@@ -91,15 +91,23 @@ class CustomerOrderService:
         return entities
     
     async def find_by_name_and_agent(
-        self, name: str, agent_id: str
+        self, name: str, agent_id: str, moment: Optional[datetime] = None
     ) -> CustomerOrderEntity:
         """Найти заказ по номеру и контрагенту."""
-        filter_str = (
-            f"agent=https://api.moysklad.ru/api/remap/1.2/entity/counterparty/{agent_id};"
-            f"name={name}"
-        )
+        filter_parts = [
+            f"agent=https://api.moysklad.ru/api/remap/1.2/entity/counterparty/{agent_id}",
+            f"name={name}",
+        ]
+
+        if moment:
+            start = moment.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = moment.replace(hour=23, minute=59, second=59, microsecond=999999)
+            filter_parts.append(f"moment>={start.strftime('%Y-%m-%d %H:%M:%S')}")
+            filter_parts.append(f"moment<={end.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        filter_str = ";".join(filter_parts)
         orders_data = await self._client.search(filter_str=filter_str, limit=1)
-        
+
         if not orders_data:
             raise CustomerOrderNotFoundError(
                 f"Заказ с номером '{name}' для контрагента {agent_id} не найден"
