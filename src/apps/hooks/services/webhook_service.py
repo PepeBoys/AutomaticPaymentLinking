@@ -68,6 +68,9 @@ class WebhookService:
                 payment_status_on_failure=data.get("payment_status_on_failure"),
                 document_status_on_success=data.get("document_status_on_success"),
                 document_status_on_failure=data.get("document_status_on_failure"),
+                transfer_project_to_payment=data.get(
+                    "transfer_project_to_payment", False
+                ),
             )
 
         logger.debug("Статус вебхуков: %s", result)
@@ -84,6 +87,7 @@ class WebhookService:
         payment_status_on_failure: str | None,
         document_status_on_success: str | None,
         document_status_on_failure: str | None,
+        transfer_project_to_payment: bool,
     ) -> Dict[str, str]:
         """
         Обновить настройки привязки БЕЗ обращения к МойСклад API.
@@ -106,6 +110,7 @@ class WebhookService:
             payment_status_on_failure=payment_status_on_failure,
             document_status_on_success=document_status_on_success,
             document_status_on_failure=document_status_on_failure,
+            transfer_project_to_payment=transfer_project_to_payment,
         )
 
         if not updated:
@@ -138,6 +143,7 @@ class WebhookService:
             "payment_status_on_failure": payment_status_on_failure,
             "document_status_on_success": document_status_on_success,
             "document_status_on_failure": document_status_on_failure,
+            "transfer_project_to_payment": transfer_project_to_payment,
         }
 
     async def toggle_webhook(
@@ -152,6 +158,7 @@ class WebhookService:
         payment_status_on_failure: str | None = None,
         document_status_on_success: str | None = None,
         document_status_on_failure: str | None = None,
+        transfer_project_to_payment: bool = False,
     ) -> WebhookOperationResult:
         webhook_url = settings.ms_webhook_url
         
@@ -209,6 +216,9 @@ class WebhookService:
                 result.webhook_entity.payment_status_on_failure = payment_status_on_failure
                 result.webhook_entity.document_status_on_success = document_status_on_success
                 result.webhook_entity.document_status_on_failure = document_status_on_failure
+                result.webhook_entity.transfer_project_to_payment = (
+                    transfer_project_to_payment
+                )
                 saved_entity = await self._uow.webhooks.upsert(result.webhook_entity)
                 await self._uow.commit()
 
@@ -241,6 +251,9 @@ class WebhookService:
                     existing_db_entity.payment_status_on_failure = payment_status_on_failure
                     existing_db_entity.document_status_on_success = document_status_on_success
                     existing_db_entity.document_status_on_failure = document_status_on_failure
+                    existing_db_entity.transfer_project_to_payment = (
+                        transfer_project_to_payment
+                    )
                     saved_entity = await self._uow.webhooks.update(existing_db_entity)
                     await self._uow.commit()
 

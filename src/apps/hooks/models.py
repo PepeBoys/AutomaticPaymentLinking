@@ -68,6 +68,13 @@ class WebhookSubscription(Base):
         nullable=True,
     )
 
+    transfer_project_to_payment = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
     __table_args__ = (
         Index(
             "ix_webhook_payment_enabled",
