@@ -1,18 +1,11 @@
-"""Исключения для работы с заказами покупателя."""
+"""Исключения для работы с заказами покупателей."""
 
+from ..payable_document_base.exceptions import (
+    BaseDocumentException,
+    DocumentAPIError,
+    DocumentNotFoundError,
+)
 
-class CustomerOrderBaseException(Exception):
-    """Базовое исключение для заказов покупателя."""
-    
-    def __init__(self, message: str, details: dict | None = None) -> None:
-        self.message = message
-        self.details = details or {}
-        super().__init__(self.message)
-
-
-class CustomerOrderNotFoundError(CustomerOrderBaseException):
-    """Заказ покупателя не найден."""
-
-
-class CustomerOrderAPIError(CustomerOrderBaseException):
-    """Ошибка при работе с API заказов покупателя."""
+CustomerOrderBaseException = BaseDocumentException
+CustomerOrderAPIError = DocumentAPIError
+CustomerOrderNotFoundError = DocumentNotFoundError

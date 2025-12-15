@@ -1,18 +1,11 @@
-"""Исключения для работы со счетами покупателю."""
+"""Исключения для работы со счетами поставщиков."""
 
+from ..payable_document_base.exceptions import (
+    BaseDocumentException,
+    DocumentAPIError,
+    DocumentNotFoundError,
+)
 
-class InvoiceInBaseException(Exception):
-    """Базовое исключение для счетов покупателю."""
-
-    def __init__(self, message: str, details: dict | None = None) -> None:
-        self.message = message
-        self.details = details or {}
-        super().__init__(self.message)
-
-
-class InvoiceInNotFoundError(InvoiceInBaseException):
-    """Счет покупателю не найден."""
-
-
-class InvoiceInAPIError(InvoiceInBaseException):
-    """Ошибка при работе с API счетов покупателю."""
+InvoiceInBaseException = BaseDocumentException
+InvoiceInAPIError = DocumentAPIError
+InvoiceInNotFoundError = DocumentNotFoundError

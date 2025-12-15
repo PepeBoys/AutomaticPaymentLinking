@@ -1,18 +1,11 @@
-"""Исключения для работы с отгрузками (supply)."""
+"""Исключения для работы с поступлениями."""
 
+from ..payable_document_base.exceptions import (
+    BaseDocumentException,
+    DocumentAPIError,
+    DocumentNotFoundError,
+)
 
-class SupplyBaseException(Exception):
-    """Базовое исключение для отгрузок."""
-
-    def __init__(self, message: str, details: dict | None = None) -> None:
-        self.message = message
-        self.details = details or {}
-        super().__init__(self.message)
-
-
-class SupplyNotFoundError(SupplyBaseException):
-    """Отгрузка не найдена."""
-
-
-class SupplyAPIError(SupplyBaseException):
-    """Ошибка при работе с API отгрузок."""
+SupplyBaseException = BaseDocumentException
+SupplyAPIError = DocumentAPIError
+SupplyNotFoundError = DocumentNotFoundError

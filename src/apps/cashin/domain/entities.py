@@ -1,23 +1,12 @@
 """Доменные сущности приходных ордеров."""
 
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
+
+from ..payment_base.domain.entities import BasePaymentEntity
 
 
 @dataclass
-class CashInEntity:
+class CashInEntity(BasePaymentEntity):
     """Доменная сущность приходного ордера."""
 
-    id: str
-    account_id: str
-    name: str
-    moment: datetime
-    applicable: bool
-    sum: float
-    agent_id: str
-    organization_id: str
-    payment_purpose: Optional[str]
-    linked_operations: list[dict]
-    meta_href: str
-    project_meta_href: Optional[str] = None
+    pass

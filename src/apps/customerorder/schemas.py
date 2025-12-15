@@ -1,60 +1,8 @@
-"""Pydantic схемы для работы с заказами покупателя."""
+"""Pydantic схемы для работы с заказами покупателей."""
 
-from datetime import datetime
-from typing import Optional
+from ..payable_document_base.schemas import BaseDocumentResponse
 
-from pydantic import BaseModel
-
-
-class MetaRef(BaseModel):
-    """Метаданные ссылки на сущность."""
-    href: str
-    type: str
-    mediaType: str = "application/json"
-
-
-class Agent(BaseModel):
-    """Контрагент."""
-    meta: MetaRef
-
-
-class Organization(BaseModel):
-    """Организация."""
-    meta: MetaRef
-
-
-class CustomerOrderResponse(BaseModel):
+class CustomerOrderResponse(BaseDocumentResponse):
     """Ответ API с информацией о заказе покупателя."""
-    id: str
-    accountId: str
-    name: str
-    moment: datetime
-    applicable: bool
-    sum: float
-    payedSum: float
-    shippedSum: float
-    invoicedSum: float
-    agent: Agent
-    organization: Organization
-    meta: MetaRef
-    
-    class Config:
-        extra = "allow"
 
-
-class CustomerOrderListResponse(BaseModel):
-    """Ответ API со списком заказов."""
-    context: dict
-    meta: dict
-    rows: list[CustomerOrderResponse]
-
-
-class CustomerOrderSearchParams(BaseModel):
-    """Параметры поиска заказов покупателя."""
-    agent_id: Optional[str] = None
-    sum_from: Optional[float] = None
-    sum_to: Optional[float] = None
-    moment_from: Optional[datetime] = None
-    moment_to: Optional[datetime] = None
-    limit: int = 100
-    offset: int = 0
+    pass
