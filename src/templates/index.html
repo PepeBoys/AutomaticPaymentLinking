@@ -183,6 +183,7 @@
             const maskInput = tab.querySelector('.js-payment-purpose-mask');
             const statusSelects = tab.querySelectorAll('select');
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+            const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
 
             documentRadios.forEach(radio => radio.disabled = disabled);
             linkRadios.forEach(radio => radio.disabled = disabled);
@@ -191,6 +192,7 @@
             if (maskInput) maskInput.disabled = disabled;
             statusSelects.forEach(select => select.disabled = disabled);
             if (transferProjectCheckbox) transferProjectCheckbox.disabled = disabled;
+            if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = disabled;
         }
 
         function toggleMaskVisibility(paymentType) {
@@ -575,6 +577,20 @@
             }, 300, `transfer_${paymentType}`);
 
             transferCheckbox.addEventListener('change', debouncedTransferUpdate);
+        });
+
+        document.querySelectorAll('.js-check-organization').forEach((orgCheckbox) => {
+            const paymentType = orgCheckbox.dataset.paymentType;
+
+            const debouncedOrgUpdate = debounce(function() {
+                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
+
+                if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
+                    updateLinkSettings(paymentType);
+                }
+            }, 300, `check_org_${paymentType}`);
+
+            orgCheckbox.addEventListener('change', debouncedOrgUpdate);
         });
 
         setTimeout(() => {
