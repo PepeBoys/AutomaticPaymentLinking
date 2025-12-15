@@ -1,49 +1,63 @@
-<div class="link-settings" style="margin-top: 24px; padding: 16px; background: #f8f9fa; border-radius: 4px;">
-    <div class="h3" style="margin-bottom: 12px;">
-        Настройки привязки
+<div class="link-settings settings-card" style="margin-top: 20px;">
+    
+    <!-- Основные настройки -->
+    <div class="settings-section">
+        <div class="section-title">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2 5h12M2 8h12M2 11h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Тип документа
+        </div>
+
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <label class="radio option" style="margin-bottom: 0;">
+                <input
+                    class="radio__input js-document-type"
+                    type="radio"
+                    name="document_type_{{ payment_type }}"
+                    value="customerorder"
+                    data-payment-type="{{ payment_type }}"
+                    checked
+                >
+                <span class="radio__box"></span>
+                <span class="radio__text">Заказ покупателя</span>
+            </label>
+            <label class="radio option" style="margin-bottom: 0;">
+                <input
+                    class="radio__input js-document-type"
+                    type="radio"
+                    name="document_type_{{ payment_type }}"
+                    value="invoiceout"
+                    data-payment-type="{{ payment_type }}"
+                >
+                <span class="radio__box"></span>
+                <span class="radio__text">Счет</span>
+            </label>
+            <label class="radio option" style="margin-bottom: 0;">
+                <input
+                    class="radio__input js-document-type"
+                    type="radio"
+                    name="document_type_{{ payment_type }}"
+                    value="demand"
+                    data-payment-type="{{ payment_type }}"
+                >
+                <span class="radio__box"></span>
+                <span class="radio__text">Отгрузка</span>
+            </label>
+        </div>
     </div>
 
-    <div style="margin-bottom: 16px;">
-        <div class="caption" style="margin-bottom: 8px;">Тип документа:</div>
-        <label class="radio option">
-            <input
-                class="radio__input js-document-type"
-                type="radio"
-                name="document_type_{{ payment_type }}"
-                value="customerorder"
-                data-payment-type="{{ payment_type }}"
-                checked
-            >
-            <span class="radio__box"></span>
-            <span class="radio__text">Заказ покупателя</span>
-        </label>
-        <label class="radio option">
-            <input
-                class="radio__input js-document-type"
-                type="radio"
-                name="document_type_{{ payment_type }}"
-                value="invoiceout"
-                data-payment-type="{{ payment_type }}"
-            >
-            <span class="radio__box"></span>
-            <span class="radio__text">Счет покупателя</span>
-        </label>
-        <label class="radio option">
-            <input
-                class="radio__input js-document-type"
-                type="radio"
-                name="document_type_{{ payment_type }}"
-                value="demand"
-                data-payment-type="{{ payment_type }}"
-            >
-            <span class="radio__box"></span>
-            <span class="radio__text">Отгрузка</span>
-        </label>
-    </div>
+    <!-- Критерии поиска -->
+    <div class="settings-section">
+        <div class="section-title">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Критерии поиска документа
+        </div>
 
-    <div>
-        <div class="caption" style="margin-bottom: 8px;">Тип привязки:</div>
-        <label class="radio option">
+        <label class="radio option" style="margin-bottom: 8px;">
             <input
                 class="radio__input js-link-type"
                 type="radio"
@@ -55,7 +69,7 @@
             <span class="radio__box"></span>
             <span class="radio__text">По сумме и контрагенту</span>
         </label>
-        <label class="radio option">
+        <label class="radio option" style="margin-bottom: 8px;">
             <input
                 class="radio__input js-link-type"
                 type="radio"
@@ -64,9 +78,9 @@
                 data-payment-type="{{ payment_type }}"
             >
             <span class="radio__box"></span>
-            <span class="radio__text">По контрагенту</span>
+            <span class="radio__text">Только по контрагенту</span>
         </label>
-        <label class="radio option">
+        <label class="radio option" style="margin-bottom: 8px;">
             <input
                 class="radio__input js-link-type"
                 type="radio"
@@ -75,59 +89,74 @@
                 data-payment-type="{{ payment_type }}"
             >
             <span class="radio__box"></span>
-            <span class="radio__text">По маске назначения платежа</span>
+            <span class="radio__text">По шаблону назначения платежа</span>
         </label>
-    </div>
 
-    <div
-        class="payment-purpose-mask js-mask-container"
-        data-payment-type="{{ payment_type }}"
-        style="display: none; margin-top: 12px;"
-    >
-        <div class="caption" style="margin-bottom: 8px;">Маска назначеня платежа:</div>
-        <input
-            class="textfield js-payment-purpose-mask"
-            type="text"
-            name="payment_purpose_mask_{{ payment_type }}"
+        <div
+            class="js-mask-container"
             data-payment-type="{{ payment_type }}"
-            placeholder="Оплата по акту №$name от $moment за услуги..."
-            style="width: 100%;"
+            style="display: none; margin-top: 12px; padding: 12px; background: #f9fafb; border-radius: 4px;"
         >
-        <div class="caption" style="margin-top: 6px; color: #6b7280;">
-            Используйте переменные <code>$name</code> и <code>$moment</code> (ДД.ММ.ГГГГ).
+            <label class="caption" style="display: block; margin-bottom: 6px; font-weight: 500;">
+                Шаблон назначения платежа
+            </label>
+            <input
+                class="ui-input js-payment-purpose-mask"
+                type="text"
+                name="payment_purpose_mask_{{ payment_type }}"
+                data-payment-type="{{ payment_type }}"
+                placeholder="Оплата по $name от $moment"
+                style="width: 100%; font-size: 13px;"
+            >
+            <div class="caption" style="margin-top: 6px; font-size: 11px; color: #9ca3af;">
+                Переменные: <code style="background: #e5e7eb; padding: 2px 4px; border-radius: 2px;">$name</code> — номер документа, 
+                <code style="background: #e5e7eb; padding: 2px 4px; border-radius: 2px;">$moment</code> — дата (ДД.ММ.ГГГГ)
+            </div>
         </div>
     </div>
 
-    <div style="margin-top: 16px;">
-        <div class="caption" style="margin-bottom: 8px;">Приоритет документов:</div>
-        <label class="radio option">
-            <input
-                class="radio__input js-document-priority"
-                type="radio"
-                name="document_priority_{{ payment_type }}"
-                value="oldest_first"
-                data-payment-type="{{ payment_type }}"
-                checked
-            >
-            <span class="radio__box"></span>
-            <span class="radio__text">Сначала старые документы</span>
-        </label>
-        <label class="radio option">
-            <input
-                class="radio__input js-document-priority"
-                type="radio"
-                name="document_priority_{{ payment_type }}"
-                value="newest_first"
-                data-payment-type="{{ payment_type }}"
-            >
-            <span class="radio__box"></span>
-            <span class="radio__text">Сначала новые документы</span>
-        </label>
+    <!-- Приоритет -->
+    <div class="settings-section">
+        <div class="section-title">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 3v10M5 6l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Приоритет документов
+        </div>
+
+        <div style="display: flex; gap: 16px;">
+            <label class="radio option" style="margin-bottom: 0;">
+                <input
+                    class="radio__input js-document-priority"
+                    type="radio"
+                    name="document_priority_{{ payment_type }}"
+                    value="oldest_first"
+                    data-payment-type="{{ payment_type }}"
+                    checked
+                >
+                <span class="radio__box"></span>
+                <span class="radio__text">Сначала старые</span>
+            </label>
+            <label class="radio option" style="margin-bottom: 0;">
+                <input
+                    class="radio__input js-document-priority"
+                    type="radio"
+                    name="document_priority_{{ payment_type }}"
+                    value="newest_first"
+                    data-payment-type="{{ payment_type }}"
+                >
+                <span class="radio__box"></span>
+                <span class="radio__text">Сначала новые</span>
+            </label>
+        </div>
     </div>
 
     {% if payment_type == "incoming_payment" %}
-    <div style="margin-top: 16px;">
-        <label class="check option">
+    <!-- Дополнительные опции -->
+    <div class="settings-section" style="padding-top: 20px; border-top: 1px solid #e5e7eb;">
+        <div class="section-title">Дополнительные опции</div>
+        
+        <label class="check option" style="margin-bottom: 8px;">
             <input
                 class="check__input js-transfer-project"
                 type="checkbox"
@@ -137,9 +166,6 @@
             <span class="check__box"></span>
             <span class="check__text">Переносить проект в платеж</span>
         </label>
-    </div>
-
-    <div style="margin-top: 12px;">
         <label class="check option">
             <input
                 class="check__input js-check-organization"
@@ -152,34 +178,48 @@
         </label>
     </div>
 
-    <div style="margin-top: 16px;">
-        <div class="caption" style="margin-bottom: 8px;">Статус платежа:</div>
-        <div class="form-row" style="display: flex; gap: 12px; align-items: center;">
-            <label class="caption" style="min-width: 160px;">При успешной привязке</label>
-            <div class="js-payment-success-status-container" data-payment-type="{{ payment_type }}" style="flex: 1;"></div>
+    <!-- Статусы -->
+    <div class="settings-section" style="padding-top: 20px; border-top: 1px solid #e5e7eb;">
+        <div class="section-title">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Изменение статусов
         </div>
-        <div class="form-row" style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
-            <label class="caption" style="min-width: 160px;">Если не удалось связать</label>
-            <div class="js-payment-failure-status-container" data-payment-type="{{ payment_type }}" style="flex: 1;"></div>
+        
+        <div style="margin-bottom: 16px;">
+            <label class="caption" style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 500;">
+                Статус платежа
+            </label>
+            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center;">
+                <span class="caption" style="font-size: 11px;">Привязка успешна</span>
+                <div class="js-payment-success-status-container" data-payment-type="{{ payment_type }}"></div>
+                
+                <span class="caption" style="font-size: 11px;">Не удалось связать</span>
+                <div class="js-payment-failure-status-container" data-payment-type="{{ payment_type }}"></div>
+            </div>
+            <div class="caption js-payment-status-hint" style="color: #ef4444; margin-top: 6px; font-size: 11px; display: none;">
+                ⚠ В МойСклад нет статусов для входящего платежа
+            </div>
         </div>
-        <div class="caption js-payment-status-hint" style="color: #d14343; margin-top: 6px; display: none;">
-            В МойСклад нет статусов для входящего платежа.
-        </div>
-    </div>
-
-    <div style="margin-top: 16px;">
-        <div class="caption" style="margin-bottom: 8px;">Статус документа:</div>
-        <div class="form-row" style="display: flex; gap: 12px; align-items: center;">
-            <label class="caption" style="min-width: 160px;">При успешной привязке</label>
-            <div class="js-document-success-status-container" data-payment-type="{{ payment_type }}" style="flex: 1;"></div>
-        </div>
-        <div class="form-row" style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
-            <label class="caption" style="min-width: 160px;">Если документ не найден</label>
-            <div class="js-document-failure-status-container" data-payment-type="{{ payment_type }}" style="flex: 1;"></div>
-        </div>
-        <div class="caption js-document-status-hint" style="color: #d14343; margin-top: 6px; display: none;">
-            В МойСклад нет статусов для выбранного документа.
+        
+        <div>
+            <label class="caption" style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 500;">
+                Статус документа
+            </label>
+            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center;">
+                <span class="caption" style="font-size: 11px;">Привязка успешна</span>
+                <div class="js-document-success-status-container" data-payment-type="{{ payment_type }}"></div>
+                
+                <span class="caption" style="font-size: 11px;">Документ не найден</span>
+                <div class="js-document-failure-status-container" data-payment-type="{{ payment_type }}"></div>
+            </div>
+            <div class="caption js-document-status-hint" style="color: #ef4444; margin-top: 6px; font-size: 11px; display: none;">
+                ⚠ В МойСклад нет статусов для выбранного документа
+            </div>
         </div>
     </div>
     {% endif %}
+
 </div>

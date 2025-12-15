@@ -1,19 +1,16 @@
+<!-- path: src/templates/index.html -->
 {% extends "base.html" %}
 
 {% block content %}
 <div class="ui-kit">
     <div class="container">
 
-        <div class="h1" style="margin-top: 16px;">
+        <div class="h1" style="margin-top: 20px; margin-bottom: 8px;">
             Автоматическая привязка платежей
         </div>
 
-        <div class="h2" style="margin-top: 12px;">
-            Настройка работы:
-        </div>
-
-        <p class="caption" style="margin-top: 4px; max-width: 640px;">
-            После включения, алгоритм при создании платежа будет автоматически искать документ с такой же суммой.
+        <p class="caption" style="margin-bottom: 20px; max-width: 640px; color: #6b7280;">
+            Автоматически связывает входящие платежи с документами в МойСклад
         </p>
 
         <div class="tabs-border js-tabs" style="margin-top: 24px;">
@@ -35,8 +32,8 @@
             <div class="tabs-border__items">
                 <!-- Входящий платеж -->
                 <div class="tabs-border__item js-tabs-item b-active" data-payment-type="incoming_payment">
-                    <div style="margin-top: 16px;">
-                        <label class="check option">
+                    <div style="margin-top: 20px;">
+                        <label class="check option" style="margin-bottom: 4px;">
                             <input
                                 class="check__input js-auto-link-toggle"
                                 type="checkbox"
@@ -45,8 +42,12 @@
                                 disabled
                             >
                             <span class="check__box"></span>
-                            <span class="check__text">Включить привязку к документу</span>
+                            <span class="check__text">Включить автоматическую привязку</span>
                         </label>
+                        <div class="status-container js-status-container" data-payment-type="incoming_payment">
+                            <span class="status-indicator"></span>
+                            <span class="status-text"></span>
+                        </div>
                     </div>
                     {% set payment_type = "incoming_payment" %}
                     {% include "partials/link_settings.html" %}
@@ -54,8 +55,8 @@
 
                 <!-- Приходный ордер -->
                 <div class="tabs-border__item js-tabs-item" data-payment-type="incoming_order">
-                    <div style="margin-top: 16px;">
-                        <label class="check option">
+                    <div style="margin-top: 20px;">
+                        <label class="check option" style="margin-bottom: 4px;">
                             <input
                                 class="check__input js-auto-link-toggle"
                                 type="checkbox"
@@ -64,8 +65,12 @@
                                 disabled
                             >
                             <span class="check__box"></span>
-                            <span class="check__text">Включить привязку к документу</span>
+                            <span class="check__text">Включить автоматическую привязку</span>
                         </label>
+                        <div class="status-container js-status-container" data-payment-type="incoming_order">
+                            <span class="status-indicator"></span>
+                            <span class="status-text"></span>
+                        </div>
                     </div>
                     {% set payment_type = "incoming_order" %}
                     {% include "partials/link_settings.html" %}
@@ -73,8 +78,8 @@
 
                 <!-- Исходящий платеж -->
                 <div class="tabs-border__item js-tabs-item" data-payment-type="outgoing_payment">
-                    <div style="margin-top: 16px;">
-                        <label class="check option">
+                    <div style="margin-top: 20px;">
+                        <label class="check option" style="margin-bottom: 4px;">
                             <input
                                 class="check__input js-auto-link-toggle"
                                 type="checkbox"
@@ -83,8 +88,12 @@
                                 disabled
                             >
                             <span class="check__box"></span>
-                            <span class="check__text">Включить привязку к документу</span>
+                            <span class="check__text">Включить автоматическую привязку</span>
                         </label>
+                        <div class="status-container js-status-container" data-payment-type="outgoing_payment">
+                            <span class="status-indicator"></span>
+                            <span class="status-text"></span>
+                        </div>
                     </div>
                     {% set payment_type = "outgoing_payment" %}
                     {% include "partials/link_settings.html" %}
@@ -92,8 +101,8 @@
 
                 <!-- Расходный ордер -->
                 <div class="tabs-border__item js-tabs-item" data-payment-type="outgoing_order">
-                    <div style="margin-top: 16px;">
-                        <label class="check option">
+                    <div style="margin-top: 20px;">
+                        <label class="check option" style="margin-bottom: 4px;">
                             <input
                                 class="check__input js-auto-link-toggle"
                                 type="checkbox"
@@ -102,8 +111,12 @@
                                 disabled
                             >
                             <span class="check__box"></span>
-                            <span class="check__text">Включить привязку к документу</span>
+                            <span class="check__text">Включить автоматическую привязку</span>
                         </label>
+                        <div class="status-container js-status-container" data-payment-type="outgoing_order">
+                            <span class="status-indicator"></span>
+                            <span class="status-text"></span>
+                        </div>
                     </div>
                     {% set payment_type = "outgoing_order" %}
                     {% include "partials/link_settings.html" %}
@@ -121,6 +134,8 @@
         const debounceTimers = {};
         const processingFlags = {};
         const webhookStatusCache = {};
+        
+        let saveTimeouts = {};
 
         function createSelectElement(className, paymentType) {
             const select = document.createElement('select');
@@ -134,6 +149,39 @@
             select.appendChild(defaultOption);
             
             return select;
+        }
+
+        function showSavingIndicator(paymentType) {
+            const container = document.querySelector(`.js-status-container[data-payment-type="${paymentType}"]`);
+            if (!container) return;
+            
+            const indicator = container.querySelector('.status-indicator');
+            const text = container.querySelector('.status-text');
+            
+            indicator.className = 'status-indicator saving visible';
+            text.textContent = 'Сохранение...';
+            text.className = 'status-text visible';
+        }
+
+        function showSavedIndicator(paymentType) {
+            const container = document.querySelector(`.js-status-container[data-payment-type="${paymentType}"]`);
+            if (!container) return;
+            
+            const indicator = container.querySelector('.status-indicator');
+            const text = container.querySelector('.status-text');
+            
+            indicator.className = 'status-indicator saved visible';
+            text.textContent = 'Сохранено';
+            text.className = 'status-text visible';
+            
+            if (saveTimeouts[paymentType]) {
+                clearTimeout(saveTimeouts[paymentType]);
+            }
+            
+            saveTimeouts[paymentType] = setTimeout(() => {
+                indicator.classList.remove('visible');
+                text.classList.remove('visible');
+            }, 1500);
         }
 
         function initializeStatusSelects() {
@@ -172,27 +220,56 @@
             };
         }
 
-        function setTabControlsDisabled(paymentType, disabled) {
+        function updateTabControlsState(paymentType, enabled) {
             const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
             if (!tab) return;
 
             const documentRadios = tab.querySelectorAll('.js-document-type');
             const linkRadios = tab.querySelectorAll('.js-link-type');
             const priorityRadios = tab.querySelectorAll('.js-document-priority');
-            const checkbox = tab.querySelector('.js-auto-link-toggle');
             const maskInput = tab.querySelector('.js-payment-purpose-mask');
             const statusSelects = tab.querySelectorAll('select');
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
             const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
 
-            documentRadios.forEach(radio => radio.disabled = disabled);
-            linkRadios.forEach(radio => radio.disabled = disabled);
-            priorityRadios.forEach(radio => radio.disabled = disabled);
-            if (checkbox) checkbox.disabled = disabled;
-            if (maskInput) maskInput.disabled = disabled;
-            statusSelects.forEach(select => select.disabled = disabled);
-            if (transferProjectCheckbox) transferProjectCheckbox.disabled = disabled;
-            if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = disabled;
+            const shouldDisable = !enabled;
+
+            documentRadios.forEach(radio => radio.disabled = shouldDisable);
+            linkRadios.forEach(radio => radio.disabled = shouldDisable);
+            priorityRadios.forEach(radio => radio.disabled = shouldDisable);
+            if (maskInput) maskInput.disabled = shouldDisable;
+            statusSelects.forEach(select => select.disabled = shouldDisable);
+            if (transferProjectCheckbox) transferProjectCheckbox.disabled = shouldDisable;
+            if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = shouldDisable;
+        }
+
+        function setTabControlsDisabled(paymentType, disabled) {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+            if (!tab) return;
+
+            const checkbox = tab.querySelector('.js-auto-link-toggle');
+            
+            if (disabled) {
+                const documentRadios = tab.querySelectorAll('.js-document-type');
+                const linkRadios = tab.querySelectorAll('.js-link-type');
+                const priorityRadios = tab.querySelectorAll('.js-document-priority');
+                const maskInput = tab.querySelector('.js-payment-purpose-mask');
+                const statusSelects = tab.querySelectorAll('select');
+                const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+                const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
+
+                documentRadios.forEach(radio => radio.disabled = disabled);
+                linkRadios.forEach(radio => radio.disabled = disabled);
+                priorityRadios.forEach(radio => radio.disabled = disabled);
+                if (checkbox) checkbox.disabled = disabled;
+                if (maskInput) maskInput.disabled = disabled;
+                statusSelects.forEach(select => select.disabled = disabled);
+                if (transferProjectCheckbox) transferProjectCheckbox.disabled = disabled;
+                if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = disabled;
+            } else {
+                if (checkbox) checkbox.disabled = disabled;
+                updateTabControlsState(paymentType, checkbox ? checkbox.checked : false);
+            }
         }
 
         function toggleMaskVisibility(paymentType) {
@@ -396,6 +473,8 @@
                             if (paymentType === 'incoming_payment') {
                                 loadStatuses(paymentType);
                             }
+
+                            updateTabControlsState(paymentType, webhookData.enabled);
                         }
 
                         checkbox.disabled = false;
@@ -418,6 +497,8 @@
 
             processingFlags[paymentType] = true;
             setTabControlsDisabled(paymentType, true);
+            
+            showSavingIndicator(paymentType);
 
             fetch("/api/hooks/update-link-settings", {
                 method: "POST",
@@ -447,6 +528,7 @@
                         ...(webhookStatusCache[paymentType] || {}),
                         ...settings,
                     };
+                    showSavedIndicator(paymentType);
                 }
             })
             .catch(error => {
@@ -470,6 +552,8 @@
 
             processingFlags[paymentType] = true;
             setTabControlsDisabled(paymentType, true);
+            
+            showSavingIndicator(paymentType);
 
             fetch("/api/hooks/auto-link-toggle", {
                 method: "POST",
@@ -502,6 +586,8 @@
                         ...settings,
                         enabled,
                     };
+                    showSavedIndicator(paymentType);
+                    updateTabControlsState(paymentType, enabled);
                 }
             })
             .catch(error => {
@@ -645,6 +731,12 @@
         outline: none;
         border-color: #4a90e2;
         box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+    }
+
+    input[type="text"]:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background-color: #f5f5f5;
     }
 </style>
 {% endblock %}
