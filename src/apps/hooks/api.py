@@ -3,10 +3,15 @@ import logging
 from fastapi import APIRouter, HTTPException, Response
 
 from ..cashin.dependencies import CashInSvcDep
+from ..cashout.dependencies import CashOutSvcDep
 from ..customerorder.dependencies import CustomerOrderSvcDep
 from ..demand.dependencies import DemandSvcDep
+from ..invoicein.dependencies import InvoiceInSvcDep
 from ..invoiceout.dependencies import InvoiceOutSvcDep
 from ..paymentin.dependencies import PaymentInSvcDep
+from ..paymentout.dependencies import PaymentOutSvcDep
+from ..purchaseorder.dependencies import PurchaseOrderSvcDep
+from ..supply.dependencies import SupplySvcDep
 from .dependencies import RequestIdQuery, WebhookSvcDep
 from .schemas import (
     AutoLinkTogglePayload,
@@ -35,14 +40,26 @@ async def get_states(
     document_type: DocumentType = DocumentType.customerorder,
     paymentin_service: PaymentInSvcDep = None,
     cashin_service: CashInSvcDep = None,
+    paymentout_service: PaymentOutSvcDep = None,
+    cashout_service: CashOutSvcDep = None,
     customerorder_service: CustomerOrderSvcDep = None,
     invoiceout_service: InvoiceOutSvcDep = None,
     demand_service: DemandSvcDep = None,
+    purchaseorder_service: PurchaseOrderSvcDep = None,
+    invoicein_service: InvoiceInSvcDep = None,
+    supply_service: SupplySvcDep = None,
 ):
-    if payment_type not in (PaymentType.incoming_payment, PaymentType.incoming_order):
+    if payment_type not in (
+        PaymentType.incoming_payment,
+        PaymentType.incoming_order,
+        PaymentType.outgoing_payment,
+        PaymentType.outgoing_order,
+    ):
         raise HTTPException(
             status_code=400,
-            detail="Статусы доступны только для входящих платежей и приходных ордеров",
+            detail=(
+                "Статусы доступны только для входящих/исходящих платежей и приходных/расходных ордеров"
+            ),
         )
 
     def _map_states(raw_states: list) -> list[dict]:
@@ -62,6 +79,10 @@ async def get_states(
         payment_states = _map_states(await paymentin_service.get_states())
     elif payment_type == PaymentType.incoming_order:
         payment_states = _map_states(await cashin_service.get_states())
+    elif payment_type == PaymentType.outgoing_payment:
+        payment_states = _map_states(await paymentout_service.get_states())
+    elif payment_type == PaymentType.outgoing_order:
+        payment_states = _map_states(await cashout_service.get_states())
     document_states: list[dict] = []
 
     if document_type == DocumentType.customerorder:
@@ -70,6 +91,12 @@ async def get_states(
         document_states = _map_states(await invoiceout_service.get_states())
     elif document_type == DocumentType.demand:
         document_states = _map_states(await demand_service.get_states())
+    elif document_type == DocumentType.purchaseorder:
+        document_states = _map_states(await purchaseorder_service.get_states())
+    elif document_type == DocumentType.invoicein:
+        document_states = _map_states(await invoicein_service.get_states())
+    elif document_type == DocumentType.supply:
+        document_states = _map_states(await supply_service.get_states())
 
     return StatesResponse(
         payment_states=payment_states,
@@ -173,9 +200,14 @@ async def receive_moysklad_webhook(
     service: WebhookSvcDep,
     paymentin_service: PaymentInSvcDep,
     cashin_service: CashInSvcDep,
+    paymentout_service: PaymentOutSvcDep,
+    cashout_service: CashOutSvcDep,
     customerorder_service: CustomerOrderSvcDep,
     invoiceout_service: InvoiceOutSvcDep,
     demand_service: DemandSvcDep,
+    purchaseorder_service: PurchaseOrderSvcDep,
+    invoicein_service: InvoiceInSvcDep,
+    supply_service: SupplySvcDep,
     request_id: RequestIdQuery = None,
 ) -> Response:
     logger.info(
@@ -191,9 +223,14 @@ async def receive_moysklad_webhook(
         payload=payload,
         paymentin_service=paymentin_service,
         cashin_service=cashin_service,
+        paymentout_service=paymentout_service,
+        cashout_service=cashout_service,
         customerorder_service=customerorder_service,
         invoiceout_service=invoiceout_service,
         demand_service=demand_service,
+        purchaseorder_service=purchaseorder_service,
+        invoicein_service=invoicein_service,
+        supply_service=supply_service,
     )
 
     return Response(status_code=204)

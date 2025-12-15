@@ -6,14 +6,24 @@ from datetime import datetime
 
 from ...cashin.exceptions import CashInNotFoundError
 from ...cashin.services.cashin_service import CashInService
+from ...cashout.exceptions import CashOutNotFoundError
+from ...cashout.services.cashout_service import CashOutService
 from ...customerorder.exceptions import CustomerOrderNotFoundError
 from ...customerorder.services.customerorder_service import CustomerOrderService
 from ...demand.exceptions import DemandNotFoundError
 from ...demand.services.demand_service import DemandService
+from ...invoicein.exceptions import InvoiceInNotFoundError
+from ...invoicein.services.invoicein_service import InvoiceInService
 from ...invoiceout.exceptions import InvoiceOutNotFoundError
 from ...invoiceout.services.invoiceout_service import InvoiceOutService
 from ...paymentin.exceptions import PaymentInNotFoundError
 from ...paymentin.services.paymentin_service import PaymentInService
+from ...paymentout.exceptions import PaymentOutNotFoundError
+from ...paymentout.services.paymentout_service import PaymentOutService
+from ...purchaseorder.exceptions import PurchaseOrderNotFoundError
+from ...purchaseorder.services.purchaseorder_service import PurchaseOrderService
+from ...supply.exceptions import SupplyNotFoundError
+from ...supply.services.supply_service import SupplyService
 from ..domain.entities import WebhookEntity
 from ..schemas import DocumentPriority, DocumentType, LinkType
 
@@ -27,15 +37,25 @@ class WebhookHandler:
         self,
         paymentin_service: PaymentInService,
         cashin_service: CashInService,
+        paymentout_service: PaymentOutService,
+        cashout_service: CashOutService,
         customerorder_service: CustomerOrderService,
         invoiceout_service: InvoiceOutService,
         demand_service: DemandService,
+        purchaseorder_service: PurchaseOrderService,
+        invoicein_service: InvoiceInService,
+        supply_service: SupplyService,
     ):
         self.paymentin_service = paymentin_service
         self.cashin_service = cashin_service
+        self.paymentout_service = paymentout_service
+        self.cashout_service = cashout_service
         self.customerorder_service = customerorder_service
         self.invoiceout_service = invoiceout_service
         self.demand_service = demand_service
+        self.purchaseorder_service = purchaseorder_service
+        self.invoicein_service = invoicein_service
+        self.supply_service = supply_service
 
     async def _handle_incoming_payment(
         self,
@@ -173,6 +193,9 @@ class WebhookHandler:
             CustomerOrderNotFoundError,
             InvoiceOutNotFoundError,
             DemandNotFoundError,
+            PurchaseOrderNotFoundError,
+            InvoiceInNotFoundError,
+            SupplyNotFoundError,
         ) as exc:
             logger.warning("Документ для %s %s не найден: %s", payment_label, event_href, exc)
             await self._apply_payment_state(
@@ -207,6 +230,28 @@ class WebhookHandler:
             payment_label="приходный ордер",
         )
 
+    async def handle_paymentout_create(
+        self, event_href: str, subscription: WebhookEntity
+    ) -> dict:
+        return await self._handle_incoming_payment(
+            payment_service=self.paymentout_service,
+            event_href=event_href,
+            subscription=subscription,
+            not_found_exception=PaymentOutNotFoundError,
+            payment_label="платеж",
+        )
+
+    async def handle_cashout_create(
+        self, event_href: str, subscription: WebhookEntity
+    ) -> dict:
+        return await self._handle_incoming_payment(
+            payment_service=self.cashout_service,
+            event_href=event_href,
+            subscription=subscription,
+            not_found_exception=CashOutNotFoundError,
+            payment_label="расходный ордер",
+        )
+
     async def _find_document_for_payment(
         self,
         payment,
@@ -238,6 +283,33 @@ class WebhookHandler:
 
         if document_type == DocumentType.demand:
             return await self._find_demand_for_payment(
+                payment,
+                link_type,
+                payment_purpose_mask,
+                organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        if document_type == DocumentType.purchaseorder:
+            return await self._find_purchaseorder_for_payment(
+                payment,
+                link_type,
+                payment_purpose_mask,
+                organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        if document_type == DocumentType.invoicein:
+            return await self._find_invoicein_for_payment(
+                payment,
+                link_type,
+                payment_purpose_mask,
+                organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        if document_type == DocumentType.supply:
+            return await self._find_supply_for_payment(
                 payment,
                 link_type,
                 payment_purpose_mask,
@@ -374,6 +446,12 @@ class WebhookHandler:
                 await self.invoiceout_service.update_state(document.id, state_id)
             elif document_type == DocumentType.demand:
                 await self.demand_service.update_state(document.id, state_id)
+            elif document_type == DocumentType.purchaseorder:
+                await self.purchaseorder_service.update_state(document.id, state_id)
+            elif document_type == DocumentType.invoicein:
+                await self.invoicein_service.update_state(document.id, state_id)
+            elif document_type == DocumentType.supply:
+                await self.supply_service.update_state(document.id, state_id)
 
     async def _get_documents_by_counterparty(
         self,
@@ -404,6 +482,33 @@ class WebhookHandler:
 
         if document_type == DocumentType.demand:
             return await self.demand_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=False,
+                organization_id=organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        if document_type == DocumentType.purchaseorder:
+            return await self.purchaseorder_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=False,
+                organization_id=organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        if document_type == DocumentType.invoicein:
+            return await self.invoicein_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=False,
+                organization_id=organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        if document_type == DocumentType.supply:
+            return await self.supply_service.find_for_payment(
                 agent_id=payment.agent_id,
                 payment_sum=payment.sum,
                 search_by_sum=False,
@@ -529,6 +634,123 @@ class WebhookHandler:
 
         return None
 
+    async def _find_purchaseorder_for_payment(
+        self,
+        payment,
+        link_type: LinkType,
+        payment_purpose_mask: str | None = None,
+        organization_id: str | None = None,
+        prioritize_oldest: bool = True,
+    ):
+        """Найти подходящий заказ поставщику для платежа."""
+
+        if link_type == LinkType.sum_and_counterparty:
+            orders = await self.purchaseorder_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=True,
+                organization_id=organization_id,
+            )
+            return orders[0] if orders else None
+
+        if link_type == LinkType.counterparty:
+            orders = await self.purchaseorder_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=False,
+                organization_id=organization_id,
+            )
+            return orders[0] if orders else None
+
+        if link_type == LinkType.payment_purpose_mask:
+            return await self._find_document_by_purpose_mask(
+                payment=payment,
+                document_type=DocumentType.purchaseorder,
+                payment_purpose_mask=payment_purpose_mask,
+                organization_id=organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        return None
+
+    async def _find_invoicein_for_payment(
+        self,
+        payment,
+        link_type: LinkType,
+        payment_purpose_mask: str | None = None,
+        organization_id: str | None = None,
+        prioritize_oldest: bool = True,
+    ):
+        """Найти подходящий счет поставщика для платежа."""
+
+        if link_type == LinkType.sum_and_counterparty:
+            invoices = await self.invoicein_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=True,
+                organization_id=organization_id,
+            )
+            return invoices[0] if invoices else None
+
+        if link_type == LinkType.counterparty:
+            invoices = await self.invoicein_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=False,
+                organization_id=organization_id,
+            )
+            return invoices[0] if invoices else None
+
+        if link_type == LinkType.payment_purpose_mask:
+            return await self._find_document_by_purpose_mask(
+                payment=payment,
+                document_type=DocumentType.invoicein,
+                payment_purpose_mask=payment_purpose_mask,
+                organization_id=organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        return None
+
+    async def _find_supply_for_payment(
+        self,
+        payment,
+        link_type: LinkType,
+        payment_purpose_mask: str | None = None,
+        organization_id: str | None = None,
+        prioritize_oldest: bool = True,
+    ):
+        """Найти подходящую приемку для платежа."""
+
+        if link_type == LinkType.sum_and_counterparty:
+            supplies = await self.supply_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=True,
+                organization_id=organization_id,
+            )
+            return supplies[0] if supplies else None
+
+        if link_type == LinkType.counterparty:
+            supplies = await self.supply_service.find_for_payment(
+                agent_id=payment.agent_id,
+                payment_sum=payment.sum,
+                search_by_sum=False,
+                organization_id=organization_id,
+            )
+            return supplies[0] if supplies else None
+
+        if link_type == LinkType.payment_purpose_mask:
+            return await self._find_document_by_purpose_mask(
+                payment=payment,
+                document_type=DocumentType.supply,
+                payment_purpose_mask=payment_purpose_mask,
+                organization_id=organization_id,
+                prioritize_oldest=prioritize_oldest,
+            )
+
+        return None
+
     async def _find_document_by_purpose_mask(
         self,
         payment,
@@ -574,7 +796,41 @@ class WebhookHandler:
                     moment=moment,
                     prioritize_oldest=prioritize_oldest,
                 )
-        except (CustomerOrderNotFoundError, InvoiceOutNotFoundError, DemandNotFoundError):
+
+            if document_type == DocumentType.purchaseorder:
+                return await self.purchaseorder_service.find_by_name_and_agent(
+                    name=name,
+                    agent_id=payment.agent_id,
+                    organization_id=organization_id,
+                    moment=moment,
+                    prioritize_oldest=prioritize_oldest,
+                )
+
+            if document_type == DocumentType.invoicein:
+                return await self.invoicein_service.find_by_name_and_agent(
+                    name=name,
+                    agent_id=payment.agent_id,
+                    organization_id=organization_id,
+                    moment=moment,
+                    prioritize_oldest=prioritize_oldest,
+                )
+
+            if document_type == DocumentType.supply:
+                return await self.supply_service.find_by_name_and_agent(
+                    name=name,
+                    agent_id=payment.agent_id,
+                    organization_id=organization_id,
+                    moment=moment,
+                    prioritize_oldest=prioritize_oldest,
+                )
+        except (
+            CustomerOrderNotFoundError,
+            InvoiceOutNotFoundError,
+            DemandNotFoundError,
+            PurchaseOrderNotFoundError,
+            InvoiceInNotFoundError,
+            SupplyNotFoundError,
+        ):
             return None
 
         return None
