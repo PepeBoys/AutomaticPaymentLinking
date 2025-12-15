@@ -130,6 +130,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         document_status_on_success: str | None,
         document_status_on_failure: str | None,
         transfer_project_to_payment: bool,
+        check_document_organization: bool,
     ) -> Optional[WebhookEntity]:
         """
         Обновить настройки привязки для существующего вебхука.
@@ -161,6 +162,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         model.document_status_on_success = document_status_on_success
         model.document_status_on_failure = document_status_on_failure
         model.transfer_project_to_payment = transfer_project_to_payment
+        model.check_document_organization = check_document_organization
 
         await self._session.flush()
         await self._session.refresh(model)
@@ -212,6 +214,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "document_status_on_success": model.document_status_on_success,
                     "document_status_on_failure": model.document_status_on_failure,
                     "transfer_project_to_payment": model.transfer_project_to_payment,
+                    "check_document_organization": model.check_document_organization,
                 }
             else:
                 result[pt.value] = {
@@ -225,6 +228,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "document_status_on_success": None,
                     "document_status_on_failure": None,
                     "transfer_project_to_payment": False,
+                    "check_document_organization": False,
                 }
 
         return result
@@ -295,6 +299,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             model.document_status_on_success = entity.document_status_on_success
             model.document_status_on_failure = entity.document_status_on_failure
             model.transfer_project_to_payment = entity.transfer_project_to_payment
+            model.check_document_organization = entity.check_document_organization
 
             await self._session.flush()
             await self._session.refresh(model)
@@ -379,6 +384,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             document_status_on_success=model.document_status_on_success,
             document_status_on_failure=model.document_status_on_failure,
             transfer_project_to_payment=model.transfer_project_to_payment,
+            check_document_organization=model.check_document_organization,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -413,4 +419,5 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             document_status_on_success=entity.document_status_on_success,
             document_status_on_failure=entity.document_status_on_failure,
             transfer_project_to_payment=entity.transfer_project_to_payment,
+            check_document_organization=entity.check_document_organization,
         )

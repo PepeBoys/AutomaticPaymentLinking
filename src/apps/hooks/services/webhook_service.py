@@ -71,6 +71,9 @@ class WebhookService:
                 transfer_project_to_payment=data.get(
                     "transfer_project_to_payment", False
                 ),
+                check_document_organization=data.get(
+                    "check_document_organization", False
+                ),
             )
 
         logger.debug("Статус вебхуков: %s", result)
@@ -88,6 +91,7 @@ class WebhookService:
         document_status_on_success: str | None,
         document_status_on_failure: str | None,
         transfer_project_to_payment: bool,
+        check_document_organization: bool,
     ) -> Dict[str, str]:
         """
         Обновить настройки привязки БЕЗ обращения к МойСклад API.
@@ -111,6 +115,7 @@ class WebhookService:
             document_status_on_success=document_status_on_success,
             document_status_on_failure=document_status_on_failure,
             transfer_project_to_payment=transfer_project_to_payment,
+            check_document_organization=check_document_organization,
         )
 
         if not updated:
@@ -144,6 +149,7 @@ class WebhookService:
             "document_status_on_success": document_status_on_success,
             "document_status_on_failure": document_status_on_failure,
             "transfer_project_to_payment": transfer_project_to_payment,
+            "check_document_organization": check_document_organization,
         }
 
     async def toggle_webhook(
@@ -159,6 +165,7 @@ class WebhookService:
         document_status_on_success: str | None = None,
         document_status_on_failure: str | None = None,
         transfer_project_to_payment: bool = False,
+        check_document_organization: bool = False,
     ) -> WebhookOperationResult:
         webhook_url = settings.ms_webhook_url
         
@@ -219,6 +226,9 @@ class WebhookService:
                 result.webhook_entity.transfer_project_to_payment = (
                     transfer_project_to_payment
                 )
+                result.webhook_entity.check_document_organization = (
+                    check_document_organization
+                )
                 saved_entity = await self._uow.webhooks.upsert(result.webhook_entity)
                 await self._uow.commit()
 
@@ -253,6 +263,9 @@ class WebhookService:
                     existing_db_entity.document_status_on_failure = document_status_on_failure
                     existing_db_entity.transfer_project_to_payment = (
                         transfer_project_to_payment
+                    )
+                    existing_db_entity.check_document_organization = (
+                        check_document_organization
                     )
                     saved_entity = await self._uow.webhooks.update(existing_db_entity)
                     await self._uow.commit()
