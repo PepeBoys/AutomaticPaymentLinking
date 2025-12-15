@@ -1,4 +1,4 @@
-"""Доменные сущности приходных ордеров."""
+"""Доменные сущности расходных ордеров."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -7,7 +7,7 @@ from typing import Optional
 
 @dataclass
 class CashOutEntity:
-    """Доменная сущность приходного ордера."""
+    """Доменная сущность расходного ордера."""
 
     id: str
     account_id: str

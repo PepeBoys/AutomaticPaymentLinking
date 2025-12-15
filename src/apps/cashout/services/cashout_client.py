@@ -1,4 +1,4 @@
-"""Клиент для работы с API приходных ордеров МойСклад."""
+"""Клиент для работы с API расходных ордеров МойСклад."""
 
 import logging
 from typing import Any, Dict
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class CashOutClient:
-    """Клиент для работы с API приходных ордеров МойСклад."""
+    """Клиент для работы с API расходных ордеров МойСклад."""
     
     def __init__(self, auth_service: MySkladAuthService) -> None:
         self._auth_service = auth_service
@@ -42,32 +42,32 @@ class CashOutClient:
         reraise=True,
     )
     async def get_by_href(self, href: str) -> Dict[str, Any]:
-        """Получить приходный ордер по полному href."""
+        """Получить расходный ордер по полному href."""
         try:
             headers = self._get_headers()
             
             async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
-                logger.debug("Запрос приходного ордера по href: %s", href)
+                logger.debug("Запрос расходного ордера по href: %s", href)
                 
                 resp = await client.get(href)
                 resp.raise_for_status()
                 data = resp.json()
                 
-                logger.debug("Получен приходный ордер: %s", data.get("name"))
+                logger.debug("Получен расходный ордер: %s", data.get("name"))
                 return data
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
                 raise CashOutNotFoundError(
-                    f"Приходный ордер не найден: {href}",
+                    f"Расходный ордер не найден: {href}",
                     details={"href": href}
                 ) from exc
             raise CashOutAPIError(
-                "Ошибка HTTP при получении приходного ордера",
+                "Ошибка HTTP при получении расходного ордера",
                 details={"status_code": exc.response.status_code, "error": str(exc)},
             ) from exc
         except Exception as exc:
             raise CashOutAPIError(
-                "Ошибка при получении приходного ордера",
+                "Ошибка при получении расходного ордера",
                 details={"error": str(exc)},
             ) from exc
     
@@ -79,46 +79,46 @@ class CashOutClient:
     async def update_operations(
         self, payment_id: str, operations: list[dict]
     ) -> Dict[str, Any]:
-        """Обновить связи приходного ордера с документами."""
+        """Обновить связи расходного ордера с документами."""
         try:
             base_url = self._get_base_url()
             headers = self._get_headers()
 
             async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
                 url = f"{base_url}/entity/cashout/{payment_id}"
-                logger.debug("Обновление операций приходного ордера: %s", payment_id)
+                logger.debug("Обновление операций расходного ордера: %s", payment_id)
                 
                 resp = await client.put(url, json={"operations": operations})
                 resp.raise_for_status()
                 data = resp.json()
                 
-                logger.debug("Приходный ордер обновлен: %s", data.get("name"))
+                logger.debug("Расходный ордер обновлен: %s", data.get("name"))
                 return data
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
                 raise CashOutNotFoundError(
-                    f"Приходный ордер {payment_id} не найден",
+                    f"Расходный ордер {payment_id} не найден",
                     details={"payment_id": payment_id}
                 ) from exc
             raise CashOutAPIError(
-                "Ошибка HTTP при обновлении приходного ордера",
+                "Ошибка HTTP при обновлении расходного ордера",
                 details={"status_code": exc.response.status_code, "error": str(exc)},
             ) from exc
         except Exception as exc:
             raise CashOutAPIError(
-                "Ошибка при обновлении приходного ордера",
+                "Ошибка при обновлении расходного ордера",
                 details={"error": str(exc)},
             ) from exc
 
     async def get_states(self) -> list[Dict[str, Any]]:
-        """Получить список статусов для приходных ордеров."""
+        """Получить список статусов для расходных ордеров."""
         try:
             base_url = self._get_base_url()
             headers = self._get_headers()
 
             async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
                 url = f"{base_url}/entity/cashout/metadata"
-                logger.debug("Запрос статусов приходных ордеров")
+                logger.debug("Запрос статусов расходных ордеров")
 
                 resp = await client.get(url)
                 resp.raise_for_status()
@@ -127,17 +127,17 @@ class CashOutClient:
                 return data.get("states", [])
         except httpx.HTTPStatusError as exc:
             raise CashOutAPIError(
-                "Ошибка HTTP при получении статусов приходных ордеров",
+                "Ошибка HTTP при получении статусов расходных ордеров",
                 details={"status_code": exc.response.status_code, "error": str(exc)},
             ) from exc
         except Exception as exc:  # pragma: no cover - сетевые ошибки
             raise CashOutAPIError(
-                "Ошибка при получении статусов приходных ордеров",
+                "Ошибка при получении статусов расходных ордеров",
                 details={"error": str(exc)},
             ) from exc
 
     async def update_state(self, payment_id: str, state_id: str) -> Dict[str, Any]:
-        """Обновить статус приходного ордера."""
+        """Обновить статус расходного ордера."""
         try:
             base_url = self._get_base_url()
             headers = self._get_headers()
@@ -145,7 +145,7 @@ class CashOutClient:
 
             async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
                 url = f"{base_url}/entity/cashout/{payment_id}"
-                logger.debug("Обновление статуса приходного ордера: %s -> %s", payment_id, state_id)
+                logger.debug("Обновление статуса расходного ордера: %s -> %s", payment_id, state_id)
 
                 resp = await client.put(
                     url,
@@ -163,17 +163,17 @@ class CashOutClient:
                 return resp.json()
         except httpx.HTTPStatusError as exc:
             raise CashOutAPIError(
-                "Ошибка HTTP при обновлении статуса приходного ордера",
+                "Ошибка HTTP при обновлении статуса расходного ордера",
                 details={"status_code": exc.response.status_code, "error": str(exc)},
             ) from exc
         except Exception as exc:  # сетевые ошибки
             raise CashOutAPIError(
-                "Ошибка при обновлении статуса приходного ордера",
+                "Ошибка при обновлении статуса расходного ордера",
                 details={"error": str(exc)},
             ) from exc
 
     async def update_project(self, payment_id: str, project_href: str) -> Dict[str, Any]:
-        """Обновить проект приходного ордера."""
+        """Обновить проект расходного ордера."""
 
         try:
             base_url = self._get_base_url()
@@ -182,7 +182,7 @@ class CashOutClient:
             async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
                 url = f"{base_url}/entity/cashout/{payment_id}"
                 logger.debug(
-                    "Обновление проекта приходного ордера: %s -> %s", payment_id, project_href
+                    "Обновление проекта расходного ордера: %s -> %s", payment_id, project_href
                 )
 
                 payload = {
@@ -200,11 +200,11 @@ class CashOutClient:
                 return resp.json()
         except httpx.HTTPStatusError as exc:
             raise CashOutAPIError(
-                "Ошибка HTTP при обновлении проекта приходного ордера",
+                "Ошибка HTTP при обновлении проекта расходного ордера",
                 details={"status_code": exc.response.status_code, "error": str(exc)},
             ) from exc
         except Exception as exc:  # pragma: no cover - сетевые ошибки
             raise CashOutAPIError(
-                "Ошибка при обновлении проекта приходного ордера",
+                "Ошибка при обновлении проекта расходного ордера",
                 details={"error": str(exc)},
             ) from exc

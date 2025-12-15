@@ -1,4 +1,4 @@
-"""Сервис для работы с приходными ордерами."""
+"""Сервис для работы с расходными ордерами."""
 
 import logging
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class CashOutService:
-    """Сервис для работы с приходными ордерами."""
+    """Сервис для работы с расходными ордерами."""
 
     def __init__(self, auth_service: MySkladAuthService) -> None:
         self._auth_service = auth_service
@@ -18,10 +18,10 @@ class CashOutService:
 
     async def get_by_id(self, payment_id: str) -> CashOutEntity:
         """
-        Получить приходный ордер по ID.
+        Получить расходный ордер по ID.
         
         Args:
-            payment_id: ID приходного ордера
+            payment_id: ID расходного ордера
             
         Returns:
             Доменная сущность платежа
@@ -33,10 +33,10 @@ class CashOutService:
 
     async def get_by_href(self, href: str) -> CashOutEntity:
         """
-        Получить приходный ордер по href.
+        Получить расходный ордер по href.
 
         Args:
-            href: Полный href приходного ордера
+            href: Полный href расходного ордера
 
         Returns:
             Доменная сущность платежа
@@ -45,11 +45,11 @@ class CashOutService:
         return self._to_entity(data)
 
     async def get_states(self) -> list[dict]:
-        """Получить список статусов приходных ордеров из МойСклад."""
+        """Получить список статусов расходных ордеров из МойСклад."""
         return await self._client.get_states()
 
     async def update_state(self, payment_id: str, state_id: str) -> CashOutEntity:
-        """Установить статус приходного ордера."""
+        """Установить статус расходного ордера."""
 
         data = await self._client.update_state(payment_id, state_id)
         return self._to_entity(data)
@@ -58,15 +58,15 @@ class CashOutService:
         self, payment_id: str, document_meta_href: str, linked_sum: float
     ) -> CashOutEntity:
         """
-        Привязать приходный ордер к документу.
+        Привязать расходный ордер к документу.
         
         Args:
-            payment_id: ID приходного ордера
+            payment_id: ID расходного ордера
             document_meta_href: href документа для привязки
             linked_sum: Сумма привязки
             
         Returns:
-            Обновленная сущность приходного ордера
+            Обновленная сущность расходного ордера
         """
         payment_data = await self._client.get_by_href(
             f"{self._client._get_base_url()}/entity/cashout/{payment_id}"
@@ -91,7 +91,7 @@ class CashOutService:
         return self._to_entity(updated_data)
 
     async def update_project(self, payment_id: str, project_href: str) -> CashOutEntity:
-        """Обновить проект приходного ордера."""
+        """Обновить проект расходного ордера."""
 
         updated_data = await self._client.update_project(payment_id, project_href)
         return self._to_entity(updated_data)

@@ -185,7 +185,7 @@
         }
 
         function initializeStatusSelects() {
-            ['incoming_payment', 'incoming_order', 'outgoing_payment'].forEach((paymentType) => {
+            ['incoming_payment', 'incoming_order', 'outgoing_payment', 'outgoing_order'].forEach((paymentType) => {
                 const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
                 if (!tab) return;
 
@@ -388,7 +388,7 @@
         }
 
         function loadStatuses(paymentType) {
-            if (!['incoming_payment', 'incoming_order', 'outgoing_payment'].includes(paymentType)) return;
+            if (!['incoming_payment', 'incoming_order', 'outgoing_payment', 'outgoing_order'].includes(paymentType)) return;
 
             const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
             if (!tab) return;
@@ -473,7 +473,7 @@
                                 webhookData.payment_purpose_mask
                             );
 
-                            if (['incoming_payment', 'incoming_order', 'outgoing_payment'].includes(paymentType)) {
+                            if (['incoming_payment', 'incoming_order', 'outgoing_payment', 'outgoing_order'].includes(paymentType)) {
                                 loadStatuses(paymentType);
                             }
 
@@ -627,7 +627,7 @@
             radio.addEventListener("change", () => {
                 toggleMaskVisibility(paymentType);
 
-                if (radio.classList.contains('js-document-type') && ['incoming_payment', 'incoming_order', 'outgoing_payment'].includes(paymentType)) {
+                if (radio.classList.contains('js-document-type') && ['incoming_payment', 'incoming_order', 'outgoing_payment', 'outgoing_order'].includes(paymentType)) {
                     loadStatuses(paymentType);
                 }
             });

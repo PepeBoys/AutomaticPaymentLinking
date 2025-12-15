@@ -1,4 +1,4 @@
-"""API эндпоинты для работы с приходными ордерами."""
+"""API эндпоинты для работы с расходными ордерами."""
 
 import logging
 
@@ -18,14 +18,14 @@ async def get_cashout(
     service: CashOutSvcDep,
 ):
     """
-    Получить приходный ордер по ID.
+    Получить расходный ордер по ID.
     
     Args:
         payment_id: ID платежа в МойСклад
         service: Сервис платежей
-        
+
     Returns:
-        Информация о приходном ордере
+        Информация о расходном ордере
     """
     entity = await service.get_by_id(payment_id)
 

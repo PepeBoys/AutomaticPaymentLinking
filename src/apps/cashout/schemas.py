@@ -1,4 +1,4 @@
-"""Pydantic схемы для работы с приходными ордерами."""
+"""Pydantic схемы для работы с расходными ордерами."""
 
 from datetime import datetime
 from typing import Optional
@@ -30,7 +30,7 @@ class LinkedOperation(BaseModel):
 
 
 class CashOutResponse(BaseModel):
-    """Ответ API с информацией о приходном ордере."""
+    """Ответ API с информацией о расходном ордере."""
     id: str
     accountId: str
     name: str

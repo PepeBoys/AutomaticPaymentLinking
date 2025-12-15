@@ -1,8 +1,8 @@
-"""Исключения для работы с приходными ордерами."""
+"""Исключения для работы с расходными ордерами."""
 
 
 class CashOutBaseException(Exception):
-    """Базовое исключение для приходных ордеров."""
+    """Базовое исключение для расходных ордеров."""
     
     def __init__(self, message: str, details: dict | None = None) -> None:
         self.message = message
@@ -11,8 +11,8 @@ class CashOutBaseException(Exception):
 
 
 class CashOutNotFoundError(CashOutBaseException):
-    """Приходный ордер не найден."""
+    """Расходный ордер не найден."""
 
 
 class CashOutAPIError(CashOutBaseException):
-    """Ошибка при работе с API приходных ордеров."""
+    """Ошибка при работе с API расходных ордеров."""

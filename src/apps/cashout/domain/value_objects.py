@@ -1,4 +1,4 @@
-"""Value Objects для приходных ордеров."""
+"""Value Objects для расходных ордеров."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -7,7 +7,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class CashOutFilter:
-    """Фильтр для поиска приходных ордеров (Value Object)."""
+    """Фильтр для поиска расходных ордеров (Value Object)."""
     
     agent_id: Optional[str] = None
     sum_value: Optional[float] = None

@@ -1,4 +1,4 @@
-"""Dependency Injection для приходных ордеров."""
+"""Dependency Injection для расходных ордеров."""
 
 from typing import Annotated
 
@@ -11,7 +11,7 @@ from .services.cashout_service import CashOutService
 async def get_cashout_service(
     auth_service: MySkladAuthService = Depends(get_ms_auth_service),
 ) -> CashOutService:
-    """Получить сервис приходных ордеров."""
+    """Получить сервис расходных ордеров."""
     return CashOutService(auth_service=auth_service)
 
 
