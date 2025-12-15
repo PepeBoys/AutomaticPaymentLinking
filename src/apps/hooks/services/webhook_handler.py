@@ -94,6 +94,12 @@ class WebhookHandler:
                     linked_sum=payment.sum,
                 )
 
+            await self._apply_project_from_document(
+                payment_id=payment.id,
+                document=document,
+                transfer_project=subscription.transfer_project_to_payment,
+            )
+
             logger.info(
                 "✓ Платеж %s привязан к %s %s (сумма: %s)",
                 payment.id,
@@ -242,6 +248,35 @@ class WebhookHandler:
 
         if payment_id and state_id:
             await self.paymentin_service.update_state(payment_id, state_id)
+
+    async def _apply_project_from_document(
+        self, payment_id: str, document, transfer_project: bool
+    ) -> None:
+        """Перенести проект из документа в платеж при необходимости."""
+
+        if not transfer_project:
+            return
+
+        project_href = getattr(document, "project_meta_href", None) if document else None
+
+        if not project_href:
+            logger.info(
+                "Проект не перенесен для платежа %s: у документа нет проекта",
+                payment_id,
+            )
+            return
+
+        try:
+            await self.paymentin_service.update_project(payment_id, project_href)
+            logger.info(
+                "✓ Проект перенесен в платеж %s из документа %s",
+                payment_id,
+                document.name if document else "",
+            )
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            logger.warning(
+                "Не удалось перенести проект в платеж %s: %s", payment_id, exc
+            )
 
     async def _apply_document_states(
         self,

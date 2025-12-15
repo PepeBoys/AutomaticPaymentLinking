@@ -146,6 +146,9 @@ class CustomerOrderService:
         org_meta = data.get("organization", {}).get("meta", {})
         org_href = org_meta.get("href", "")
         org_id = org_href.split("/")[-1] if org_href else ""
+
+        project_meta = data.get("project", {}).get("meta", {})
+        project_href = project_meta.get("href") if project_meta else None
         
         return CustomerOrderEntity(
             id=data["id"],
@@ -160,6 +163,7 @@ class CustomerOrderService:
             agent_id=agent_id,
             organization_id=org_id,
             meta_href=data["meta"]["href"],
+            project_meta_href=project_href,
         )
 
     async def update_state(self, order_id: str, state_id: str) -> CustomerOrderEntity:

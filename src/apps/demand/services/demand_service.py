@@ -108,6 +108,9 @@ class DemandService:
         org_href = org_meta.get("href", "")
         org_id = org_href.split("/")[-1] if org_href else ""
 
+        project_meta = data.get("project", {}).get("meta", {})
+        project_href = project_meta.get("href") if project_meta else None
+
         if not data.get("meta", {}).get("href"):
             raise DemandNotFoundError("Некорректные данные отгрузки")
 
@@ -122,6 +125,7 @@ class DemandService:
             agent_id=agent_id,
             organization_id=org_id,
             meta_href=data["meta"]["href"],
+            project_meta_href=project_href,
         )
     
     async def update_state(self, demand_id: str, state_id: str) -> DemandEntity:

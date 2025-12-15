@@ -127,6 +127,19 @@
 
     {% if payment_type == "incoming_payment" %}
     <div style="margin-top: 16px;">
+        <label class="check option">
+            <input
+                class="check__input js-transfer-project"
+                type="checkbox"
+                name="transfer_project_{{ payment_type }}"
+                data-payment-type="{{ payment_type }}"
+            >
+            <span class="check__box"></span>
+            <span class="check__text">Переносить проект в платеж</span>
+        </label>
+    </div>
+
+    <div style="margin-top: 16px;">
         <div class="caption" style="margin-bottom: 8px;">Статус платежа:</div>
         <div class="form-row" style="display: flex; gap: 12px; align-items: center;">
             <label class="caption" style="min-width: 160px;">При успешной привязке</label>

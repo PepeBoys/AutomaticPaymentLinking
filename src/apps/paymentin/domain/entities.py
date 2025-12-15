@@ -20,3 +20,4 @@ class PaymentInEntity:
     payment_purpose: Optional[str]
     linked_operations: list[dict]
     meta_href: str
+    project_meta_href: Optional[str] = None

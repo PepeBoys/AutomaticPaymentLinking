@@ -92,6 +92,7 @@ def _apply_manual_migrations(sync_conn) -> None:
             "payment_status_on_failure": "ALTER TABLE webhooksubscriptions ADD COLUMN payment_status_on_failure VARCHAR(64)",
             "document_status_on_success": "ALTER TABLE webhooksubscriptions ADD COLUMN document_status_on_success VARCHAR(64)",
             "document_status_on_failure": "ALTER TABLE webhooksubscriptions ADD COLUMN document_status_on_failure VARCHAR(64)",
+            "transfer_project_to_payment": "ALTER TABLE webhooksubscriptions ADD COLUMN transfer_project_to_payment BOOLEAN DEFAULT FALSE",
         }
 
         for column_name, ddl in new_status_columns.items():
