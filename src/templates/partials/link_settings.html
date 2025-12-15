@@ -151,7 +151,7 @@
         </div>
     </div>
 
-    {% if payment_type == "incoming_payment" %}
+    {% if payment_type in ["incoming_payment", "incoming_order"] %}
     <!-- Дополнительные опции -->
     <div class="settings-section" style="padding-top: 20px; border-top: 1px solid #e5e7eb;">
         <div class="section-title">Дополнительные опции</div>

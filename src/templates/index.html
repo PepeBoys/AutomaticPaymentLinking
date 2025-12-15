@@ -185,26 +185,28 @@
         }
 
         function initializeStatusSelects() {
-            const tab = document.querySelector(`.js-tabs-item[data-payment-type="incoming_payment"]`);
-            if (!tab) return;
+            ['incoming_payment', 'incoming_order'].forEach((paymentType) => {
+                const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+                if (!tab) return;
 
-            const paymentSuccessContainer = tab.querySelector('.js-payment-success-status-container');
-            const paymentFailureContainer = tab.querySelector('.js-payment-failure-status-container');
-            const documentSuccessContainer = tab.querySelector('.js-document-success-status-container');
-            const documentFailureContainer = tab.querySelector('.js-document-failure-status-container');
+                const paymentSuccessContainer = tab.querySelector('.js-payment-success-status-container');
+                const paymentFailureContainer = tab.querySelector('.js-payment-failure-status-container');
+                const documentSuccessContainer = tab.querySelector('.js-document-success-status-container');
+                const documentFailureContainer = tab.querySelector('.js-document-failure-status-container');
 
-            if (paymentSuccessContainer && !paymentSuccessContainer.querySelector('select')) {
-                paymentSuccessContainer.appendChild(createSelectElement('js-payment-success-status', 'incoming_payment'));
-            }
-            if (paymentFailureContainer && !paymentFailureContainer.querySelector('select')) {
-                paymentFailureContainer.appendChild(createSelectElement('js-payment-failure-status', 'incoming_payment'));
-            }
-            if (documentSuccessContainer && !documentSuccessContainer.querySelector('select')) {
-                documentSuccessContainer.appendChild(createSelectElement('js-document-success-status', 'incoming_payment'));
-            }
-            if (documentFailureContainer && !documentFailureContainer.querySelector('select')) {
-                documentFailureContainer.appendChild(createSelectElement('js-document-failure-status', 'incoming_payment'));
-            }
+                if (paymentSuccessContainer && !paymentSuccessContainer.querySelector('select')) {
+                    paymentSuccessContainer.appendChild(createSelectElement('js-payment-success-status', paymentType));
+                }
+                if (paymentFailureContainer && !paymentFailureContainer.querySelector('select')) {
+                    paymentFailureContainer.appendChild(createSelectElement('js-payment-failure-status', paymentType));
+                }
+                if (documentSuccessContainer && !documentSuccessContainer.querySelector('select')) {
+                    documentSuccessContainer.appendChild(createSelectElement('js-document-success-status', paymentType));
+                }
+                if (documentFailureContainer && !documentFailureContainer.querySelector('select')) {
+                    documentFailureContainer.appendChild(createSelectElement('js-document-failure-status', paymentType));
+                }
+            });
         }
 
         function debounce(func, delay, key) {
@@ -470,7 +472,7 @@
                                 webhookData.payment_purpose_mask
                             );
 
-                            if (paymentType === 'incoming_payment') {
+                            if (['incoming_payment', 'incoming_order'].includes(paymentType)) {
                                 loadStatuses(paymentType);
                             }
 
@@ -624,7 +626,7 @@
             radio.addEventListener("change", () => {
                 toggleMaskVisibility(paymentType);
 
-                if (radio.classList.contains('js-document-type') && paymentType === 'incoming_payment') {
+                if (radio.classList.contains('js-document-type') && ['incoming_payment', 'incoming_order'].includes(paymentType)) {
                     loadStatuses(paymentType);
                 }
             });
