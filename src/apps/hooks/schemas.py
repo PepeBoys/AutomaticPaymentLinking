@@ -36,6 +36,10 @@ class AutoLinkTogglePayload(BaseModel):
     link_type: Optional[LinkType] = LinkType.sum_and_counterparty
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
     payment_purpose_mask: Optional[str] = None
+    payment_status_on_success: Optional[str] = None
+    payment_status_on_failure: Optional[str] = None
+    document_status_on_success: Optional[str] = None
+    document_status_on_failure: Optional[str] = None
 
 
 class UpdateLinkSettingsPayload(BaseModel):
@@ -44,6 +48,10 @@ class UpdateLinkSettingsPayload(BaseModel):
     link_type: LinkType
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
     payment_purpose_mask: Optional[str] = None
+    payment_status_on_success: Optional[str] = None
+    payment_status_on_failure: Optional[str] = None
+    document_status_on_success: Optional[str] = None
+    document_status_on_failure: Optional[str] = None
 
 
 class WebhookStatusItem(BaseModel):
@@ -52,6 +60,23 @@ class WebhookStatusItem(BaseModel):
     link_type: LinkType
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
     payment_purpose_mask: Optional[str] = None
+    payment_status_on_success: Optional[str] = None
+    payment_status_on_failure: Optional[str] = None
+    document_status_on_success: Optional[str] = None
+    document_status_on_failure: Optional[str] = None
+
+
+class StateItem(BaseModel):
+    id: str
+    name: str
+    color: Optional[int] = None
+
+
+class StatesResponse(BaseModel):
+    payment_states: List[StateItem]
+    document_states: List[StateItem]
+    has_payment_states: bool
+    has_document_states: bool
 
 
 class WebhookStatusResponse(BaseModel):

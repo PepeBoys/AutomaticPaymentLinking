@@ -84,7 +84,7 @@
         data-payment-type="{{ payment_type }}"
         style="display: none; margin-top: 12px;"
     >
-        <div class="caption" style="margin-bottom: 8px;">Маска назначения платежа:</div>
+        <div class="caption" style="margin-bottom: 8px;">Маска назначеня платежа:</div>
         <input
             class="textfield js-payment-purpose-mask"
             type="text"
@@ -124,4 +124,60 @@
             <span class="radio__text">Сначала новые документы</span>
         </label>
     </div>
+
+    {% if payment_type == "incoming_payment" %}
+    <div style="margin-top: 16px;">
+        <div class="caption" style="margin-bottom: 8px;">Статус платежа:</div>
+        <div class="form-row" style="display: flex; gap: 12px; align-items: center;">
+            <label class="caption" style="min-width: 160px;">При успешной привязке</label>
+            <select
+                class="select js-payment-success-status"
+                data-payment-type="{{ payment_type }}"
+                style="flex: 1;"
+            >
+                <option value="">Не менять</option>
+            </select>
+        </div>
+        <div class="form-row" style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
+            <label class="caption" style="min-width: 160px;">Если не удалось связать</label>
+            <select
+                class="select js-payment-failure-status"
+                data-payment-type="{{ payment_type }}"
+                style="flex: 1;"
+            >
+                <option value="">Не менять</option>
+            </select>
+        </div>
+        <div class="caption js-payment-status-hint" style="color: #d14343; margin-top: 6px; display: none;">
+            В МойСклад нет статусов для входящего платежа.
+        </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+        <div class="caption" style="margin-bottom: 8px;">Статус документа:</div>
+        <div class="form-row" style="display: flex; gap: 12px; align-items: center;">
+            <label class="caption" style="min-width: 160px;">При успешной привязке</label>
+            <select
+                class="select js-document-success-status"
+                data-payment-type="{{ payment_type }}"
+                style="flex: 1;"
+            >
+                <option value="">Не менять</option>
+            </select>
+        </div>
+        <div class="form-row" style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
+            <label class="caption" style="min-width: 160px;">Если документ не найден</label>
+            <select
+                class="select js-document-failure-status"
+                data-payment-type="{{ payment_type }}"
+                style="flex: 1;"
+            >
+                <option value="">Не менять</option>
+            </select>
+        </div>
+        <div class="caption js-document-status-hint" style="color: #d14343; margin-top: 6px; display: none;">
+            В МойСклад нет статусов для выбранного документа.
+        </div>
+    </div>
+    {% endif %}
 </div>

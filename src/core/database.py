@@ -86,3 +86,14 @@ def _apply_manual_migrations(sync_conn) -> None:
                 "ALTER TABLE webhooksubscriptions "
                 "ADD COLUMN payment_purpose_mask VARCHAR(512)"
             )
+
+        new_status_columns = {
+            "payment_status_on_success": "ALTER TABLE webhooksubscriptions ADD COLUMN payment_status_on_success VARCHAR(64)",
+            "payment_status_on_failure": "ALTER TABLE webhooksubscriptions ADD COLUMN payment_status_on_failure VARCHAR(64)",
+            "document_status_on_success": "ALTER TABLE webhooksubscriptions ADD COLUMN document_status_on_success VARCHAR(64)",
+            "document_status_on_failure": "ALTER TABLE webhooksubscriptions ADD COLUMN document_status_on_failure VARCHAR(64)",
+        }
+
+        for column_name, ddl in new_status_columns.items():
+            if column_name not in columns:
+                sync_conn.exec_driver_sql(ddl)

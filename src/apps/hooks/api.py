@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response
 
 from ..customerorder.dependencies import CustomerOrderSvcDep
 from ..demand.dependencies import DemandSvcDep
@@ -9,8 +9,10 @@ from ..paymentin.dependencies import PaymentInSvcDep
 from .dependencies import RequestIdQuery, WebhookSvcDep
 from .schemas import (
     AutoLinkTogglePayload,
+    DocumentType,
     MySkladWebhookPayload,
     PaymentType,
+    StatesResponse,
     UpdateLinkSettingsPayload,
     WebhookStatusResponse,
 )
@@ -26,18 +28,63 @@ async def get_webhooks_status(service: WebhookSvcDep):
     return WebhookStatusResponse(webhooks=status_dict)
 
 
+@router.get("/statuses", response_model=StatesResponse)
+async def get_states(
+    payment_type: PaymentType,
+    document_type: DocumentType = DocumentType.customerorder,
+    paymentin_service: PaymentInSvcDep = None,
+    customerorder_service: CustomerOrderSvcDep = None,
+    invoiceout_service: InvoiceOutSvcDep = None,
+    demand_service: DemandSvcDep = None,
+):
+    if payment_type != PaymentType.incoming_payment:
+        raise HTTPException(status_code=400, detail="Статусы пока доступны только для входящих платежей")
+
+    def _map_states(raw_states: list) -> list[dict]:
+        return [
+            {
+                "id": state.get("id", ""),
+                "name": state.get("name", ""),
+                "color": state.get("color"),
+            }
+            for state in raw_states
+            if state.get("id")
+        ]
+
+    payment_states = _map_states(await paymentin_service.get_states())
+    document_states: list[dict] = []
+
+    if document_type == DocumentType.customerorder:
+        document_states = _map_states(await customerorder_service.get_states())
+    elif document_type == DocumentType.invoiceout:
+        document_states = _map_states(await invoiceout_service.get_states())
+    elif document_type == DocumentType.demand:
+        document_states = _map_states(await demand_service.get_states())
+
+    return StatesResponse(
+        payment_states=payment_states,
+        document_states=document_states,
+        has_payment_states=bool(payment_states),
+        has_document_states=bool(document_states),
+    )
+
+
 @router.post("/update-link-settings")
 async def update_link_settings(
     payload: UpdateLinkSettingsPayload,
     service: WebhookSvcDep,
 ):
     logger.info(
-        "Обновление настроек привязки: payment_type=%s, document_type=%s, link_type=%s, priority=%s, mask=%s",
+        "Обновление настроек привязки: payment_type=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, doc_fail=%s",
         payload.payment_type,
         payload.document_type,
         payload.link_type,
         payload.document_priority,
         payload.payment_purpose_mask,
+        payload.payment_status_on_success,
+        payload.payment_status_on_failure,
+        payload.document_status_on_success,
+        payload.document_status_on_failure,
     )
 
     result = await service.update_link_settings(
@@ -46,6 +93,10 @@ async def update_link_settings(
         link_type=payload.link_type,
         document_priority=payload.document_priority,
         payment_purpose_mask=payload.payment_purpose_mask,
+        payment_status_on_success=payload.payment_status_on_success,
+        payment_status_on_failure=payload.payment_status_on_failure,
+        document_status_on_success=payload.document_status_on_success,
+        document_status_on_failure=payload.document_status_on_failure,
     )
 
     return result
@@ -54,13 +105,17 @@ async def update_link_settings(
 @router.post("/auto-link-toggle")
 async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDep):
     logger.info(
-        "UI toggle: payment_type=%s, enabled=%s, document_type=%s, link_type=%s, priority=%s, mask=%s",
+        "UI toggle: payment_type=%s, enabled=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, doc_fail=%s",
         payload.payment_type,
         payload.enabled,
         payload.document_type,
         payload.link_type,
         payload.document_priority,
         payload.payment_purpose_mask,
+        payload.payment_status_on_success,
+        payload.payment_status_on_failure,
+        payload.document_status_on_success,
+        payload.document_status_on_failure,
     )
 
     result = await service.toggle_webhook(
@@ -70,6 +125,10 @@ async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDe
         link_type=payload.link_type,
         document_priority=payload.document_priority,
         payment_purpose_mask=payload.payment_purpose_mask,
+        payment_status_on_success=payload.payment_status_on_success,
+        payment_status_on_failure=payload.payment_status_on_failure,
+        document_status_on_success=payload.document_status_on_success,
+        document_status_on_failure=payload.document_status_on_failure,
     )
    
     if result.is_skipped():

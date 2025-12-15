@@ -109,3 +109,65 @@ class PaymentInClient:
                 "Ошибка при обновлении платежа",
                 details={"error": str(exc)},
             ) from exc
+
+    async def get_states(self) -> list[Dict[str, Any]]:
+        """Получить список статусов для входящих платежей."""
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/paymentin/metadata"
+                logger.debug("Запрос статусов платежей")
+
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+
+                return data.get("states", [])
+        except httpx.HTTPStatusError as exc:
+            raise PaymentInAPIError(
+                "Ошибка HTTP при получении статусов платежей",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            raise PaymentInAPIError(
+                "Ошибка при получении статусов платежей",
+                details={"error": str(exc)},
+            ) from exc
+
+    async def update_state(self, payment_id: str, state_id: str) -> Dict[str, Any]:
+        """Обновить статус входящего платежа."""
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+            state_href = f"{base_url}/entity/paymentin/metadata/states/{state_id}"
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/paymentin/{payment_id}"
+                logger.debug("Обновление статуса платежа: %s -> %s", payment_id, state_id)
+
+                resp = await client.put(
+                    url,
+                    json={
+                        "state": {
+                            "meta": {
+                                "href": state_href,
+                                "type": "state",
+                                "mediaType": "application/json",
+                            }
+                        }
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            raise PaymentInAPIError(
+                "Ошибка HTTP при обновлении статуса платежа",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # сетевые ошибки
+            raise PaymentInAPIError(
+                "Ошибка при обновлении статуса платежа",
+                details={"error": str(exc)},
+            ) from exc

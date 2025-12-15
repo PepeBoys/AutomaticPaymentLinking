@@ -29,7 +29,12 @@ class CustomerOrderService:
         """
         self._auth_service = auth_service
         self._client = CustomerOrderClient(auth_service)
-    
+
+    async def get_states(self) -> list[dict]:
+        """Получить статусы заказов покупателя."""
+
+        return await self._client.get_states()
+
     async def get_by_id(self, order_id: str) -> CustomerOrderEntity:
         """
         Получить заказ по ID.
@@ -156,3 +161,9 @@ class CustomerOrderService:
             organization_id=org_id,
             meta_href=data["meta"]["href"],
         )
+
+    async def update_state(self, order_id: str, state_id: str) -> CustomerOrderEntity:
+        """Обновить статус заказа покупателя."""
+
+        data = await self._client.update_state(order_id, state_id)
+        return self._to_entity(data)

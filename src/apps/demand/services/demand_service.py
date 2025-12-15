@@ -19,6 +19,11 @@ class DemandService:
         self._auth_service = auth_service
         self._client = DemandClient(auth_service)
 
+    async def get_states(self) -> list[dict]:
+        """Получить статусы отгрузок."""
+
+        return await self._client.get_states()
+
     async def find_for_payment(
         self,
         agent_id: str,
@@ -118,3 +123,9 @@ class DemandService:
             organization_id=org_id,
             meta_href=data["meta"]["href"],
         )
+    
+    async def update_state(self, demand_id: str, state_id: str) -> DemandEntity:
+        """Обновить статус отгрузки."""
+
+        data = await self._client.update_state(demand_id, state_id)
+        return self._to_entity(data)

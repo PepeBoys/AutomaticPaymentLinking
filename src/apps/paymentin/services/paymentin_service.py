@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 
 class PaymentInService:
     """Сервис для работы с входящими платежами."""
-    
+
     def __init__(self, auth_service: MySkladAuthService) -> None:
         self._auth_service = auth_service
         self._client = PaymentInClient(auth_service)
-    
+
     async def get_by_id(self, payment_id: str) -> PaymentInEntity:
         """
         Получить платеж по ID.
@@ -34,16 +34,26 @@ class PaymentInService:
     async def get_by_href(self, href: str) -> PaymentInEntity:
         """
         Получить платеж по href.
-        
+
         Args:
             href: Полный href платежа
-            
+
         Returns:
             Доменная сущность платежа
         """
         data = await self._client.get_by_href(href)
         return self._to_entity(data)
-    
+
+    async def get_states(self) -> list[dict]:
+        """Получить список статусов платежей из МойСклад."""
+        return await self._client.get_states()
+
+    async def update_state(self, payment_id: str, state_id: str) -> PaymentInEntity:
+        """Установить статус платежа."""
+
+        data = await self._client.update_state(payment_id, state_id)
+        return self._to_entity(data)
+
     async def link_to_document(
         self, payment_id: str, document_meta_href: str, linked_sum: float
     ) -> PaymentInEntity:

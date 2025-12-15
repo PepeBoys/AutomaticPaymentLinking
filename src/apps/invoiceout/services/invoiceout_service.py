@@ -19,6 +19,11 @@ class InvoiceOutService:
         self._auth_service = auth_service
         self._client = InvoiceOutClient(auth_service)
 
+    async def get_states(self) -> list[dict]:
+        """Получить статусы счетов покупателю."""
+
+        return await self._client.get_states()
+
     async def find_for_payment(
         self,
         agent_id: str,
@@ -116,3 +121,9 @@ class InvoiceOutService:
             organization_id=org_id,
             meta_href=data["meta"]["href"],
         )
+
+    async def update_state(self, invoice_id: str, state_id: str) -> InvoiceOutEntity:
+        """Обновить статус счета покупателю."""
+
+        data = await self._client.update_state(invoice_id, state_id)
+        return self._to_entity(data)

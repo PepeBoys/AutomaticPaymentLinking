@@ -64,11 +64,15 @@ class WebhookService:
                 link_type=LinkType(data["link_type"]),
                 document_priority=DocumentPriority(data["document_priority"]),
                 payment_purpose_mask=data.get("payment_purpose_mask"),
+                payment_status_on_success=data.get("payment_status_on_success"),
+                payment_status_on_failure=data.get("payment_status_on_failure"),
+                document_status_on_success=data.get("document_status_on_success"),
+                document_status_on_failure=data.get("document_status_on_failure"),
             )
-        
+
         logger.debug("Статус вебхуков: %s", result)
         return result
-    
+
     async def update_link_settings(
         self,
         payment_type: PaymentType,
@@ -76,15 +80,19 @@ class WebhookService:
         link_type: LinkType,
         document_priority: DocumentPriority,
         payment_purpose_mask: str | None,
+        payment_status_on_success: str | None,
+        payment_status_on_failure: str | None,
+        document_status_on_success: str | None,
+        document_status_on_failure: str | None,
     ) -> Dict[str, str]:
         """
         Обновить настройки привязки БЕЗ обращения к МойСклад API.
-        
+
         Args:
             payment_type: Тип платежа
             document_type: Тип документа
             link_type: Тип привязки
-            
+
         Returns:
             Результат операции
         """
@@ -94,6 +102,10 @@ class WebhookService:
             link_type=link_type,
             document_priority=document_priority,
             payment_purpose_mask=payment_purpose_mask,
+            payment_status_on_success=payment_status_on_success,
+            payment_status_on_failure=payment_status_on_failure,
+            document_status_on_success=document_status_on_success,
+            document_status_on_failure=document_status_on_failure,
         )
 
         if not updated:
@@ -114,7 +126,7 @@ class WebhookService:
             document_type.value,
             link_type.value,
         )
-        
+
         return {
             "status": "ok",
             "payment_type": payment_type.value,
@@ -122,8 +134,12 @@ class WebhookService:
             "link_type": link_type.value,
             "document_priority": document_priority.value,
             "payment_purpose_mask": payment_purpose_mask,
+            "payment_status_on_success": payment_status_on_success,
+            "payment_status_on_failure": payment_status_on_failure,
+            "document_status_on_success": document_status_on_success,
+            "document_status_on_failure": document_status_on_failure,
         }
-    
+
     async def toggle_webhook(
         self,
         payment_type: PaymentType,
@@ -132,6 +148,10 @@ class WebhookService:
         link_type: LinkType = LinkType.sum_and_counterparty,
         document_priority: DocumentPriority = DocumentPriority.oldest_first,
         payment_purpose_mask: str | None = None,
+        payment_status_on_success: str | None = None,
+        payment_status_on_failure: str | None = None,
+        document_status_on_success: str | None = None,
+        document_status_on_failure: str | None = None,
     ) -> WebhookOperationResult:
         webhook_url = settings.ms_webhook_url
         
@@ -168,16 +188,16 @@ class WebhookService:
             config=config,
             existing_db_entity=existing_db_entity,
         )
-        
+
         result = await operation.execute()
-        
+
         logger.info(
             "Результат операции: operation=%s, success=%s, has_entity=%s",
             result.operation,
             result.success,
             result.webhook_entity is not None,
         )
-        
+
         if result.success:
             if result.webhook_entity:
                 result.webhook_entity.payment_type = payment_type
@@ -185,9 +205,13 @@ class WebhookService:
                 result.webhook_entity.link_type = link_type
                 result.webhook_entity.document_priority = document_priority
                 result.webhook_entity.payment_purpose_mask = payment_purpose_mask
+                result.webhook_entity.payment_status_on_success = payment_status_on_success
+                result.webhook_entity.payment_status_on_failure = payment_status_on_failure
+                result.webhook_entity.document_status_on_success = document_status_on_success
+                result.webhook_entity.document_status_on_failure = document_status_on_failure
                 saved_entity = await self._uow.webhooks.upsert(result.webhook_entity)
                 await self._uow.commit()
-                
+
                 logger.info(
                     "Webhook сохранен в БД: id=%s, ms_webhook_id=%s, enabled=%s, document_type=%s, link_type=%s",
                     saved_entity.id,
@@ -196,11 +220,11 @@ class WebhookService:
                     saved_entity.document_type.value,
                     saved_entity.link_type.value,
                 )
-                
+
                 result.details["db_record_id"] = saved_entity.id
             else:
                 existing_db_entity = await self._uow.webhooks.get_by_payment_type(payment_type)
-                
+
                 if existing_db_entity:
                     logger.info(
                         "Webhook entity не вернулась из операции, но найдена в БД. "
@@ -213,24 +237,28 @@ class WebhookService:
                     existing_db_entity.link_type = link_type
                     existing_db_entity.document_priority = document_priority
                     existing_db_entity.payment_purpose_mask = payment_purpose_mask
+                    existing_db_entity.payment_status_on_success = payment_status_on_success
+                    existing_db_entity.payment_status_on_failure = payment_status_on_failure
+                    existing_db_entity.document_status_on_success = document_status_on_success
+                    existing_db_entity.document_status_on_failure = document_status_on_failure
                     saved_entity = await self._uow.webhooks.update(existing_db_entity)
                     await self._uow.commit()
-                    
+
                     logger.info(
                         "Webhook обновлен в БД: id=%s, enabled=%s",
                         saved_entity.id,
                         saved_entity.enabled,
                     )
-                    
+
                     result.details["db_record_id"] = saved_entity.id
                 else:
                     logger.warning(
                         "Webhook entity не вернулась из операции и не найдена в БД для payment_type=%s",
                         payment_type.value,
                     )
-        
+
         return result
-    
+
     async def process_incoming_webhook(
         self,
         request_id: str | None,
@@ -242,7 +270,7 @@ class WebhookService:
     ) -> None:
         """
         Обработать входящий webhook от МойСклад.
-        
+
         Args:
             request_id: ID запроса вебхука
             payload: Данные webhook
@@ -251,10 +279,10 @@ class WebhookService:
         """
         if not request_id:
             raise MissingRequestIdError("requestId обязателен")
-        
+
         if invoiceout_service is None:
             raise ValueError("InvoiceOutService dependency is required")
-        
+
         if demand_service is None:
             raise ValueError("DemandService dependency is required")
 
@@ -274,14 +302,14 @@ class WebhookService:
                 event.accountId,
                 event.updatedFields,
             )
-            
+
             if event.meta.type == "paymentin" and event.action == "CREATE":
                 subscription = await self._uow.webhooks.get_active_subscription_for_event(
                     account_id=event.accountId,
                     entity_type=event.meta.type,
                     payment_type=PaymentType.incoming_payment,
                 )
-                
+
                 if subscription:
                     result = await handler.handle_paymentin_create(event.meta.href, subscription)
                     logger.info("Результат обработки платежа: success=%s, message=%s", result["success"], result["message"])

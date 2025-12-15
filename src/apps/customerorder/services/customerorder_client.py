@@ -247,3 +247,63 @@ class CustomerOrderClient:
 
         filter_str = ";".join(filter_parts)
         return await self.search(filter_str=filter_str, order=order, limit=limit)
+
+    async def get_states(self) -> List[Dict[str, Any]]:
+        """Получить статусы заказов покупателя."""
+
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/customerorder/metadata"
+                resp = await client.get(url)
+                resp.raise_for_status()
+
+                data = resp.json()
+                return data.get("states", [])
+        except httpx.HTTPStatusError as exc:
+            raise CustomerOrderAPIError(
+                "Ошибка HTTP при получении статусов заказов",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            raise CustomerOrderAPIError(
+                "Ошибка при получении статусов заказов",
+                details={"error": str(exc)},
+            ) from exc
+
+    async def update_state(self, order_id: str, state_id: str) -> Dict[str, Any]:
+        """Установить статус заказа покупателя."""
+
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+            state_href = f"{base_url}/entity/customerorder/metadata/states/{state_id}"
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/customerorder/{order_id}"
+                resp = await client.put(
+                    url,
+                    json={
+                        "state": {
+                            "meta": {
+                                "href": state_href,
+                                "type": "state",
+                                "mediaType": "application/json",
+                            }
+                        }
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            raise CustomerOrderAPIError(
+                "Ошибка HTTP при обновлении статуса заказа",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # pragma: no cover
+            raise CustomerOrderAPIError(
+                "Ошибка при обновлении статуса заказа",
+                details={"error": str(exc)},
+            ) from exc

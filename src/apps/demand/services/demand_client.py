@@ -138,3 +138,63 @@ class DemandClient:
 
         filter_str = ";".join(filter_parts)
         return await self.search(filter_str=filter_str, order=order, limit=limit)
+
+    async def get_states(self) -> List[Dict[str, Any]]:
+        """Получить статусы отгрузок."""
+
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/demand/metadata"
+                resp = await client.get(url)
+                resp.raise_for_status()
+
+                data = resp.json()
+                return data.get("states", [])
+        except httpx.HTTPStatusError as exc:
+            raise DemandAPIError(
+                "Ошибка HTTP при получении статусов отгрузок",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # pragma: no cover
+            raise DemandAPIError(
+                "Ошибка при получении статусов отгрузок",
+                details={"error": str(exc)},
+            ) from exc
+
+    async def update_state(self, demand_id: str, state_id: str) -> Dict[str, Any]:
+        """Установить статус отгрузки."""
+
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+            state_href = f"{base_url}/entity/demand/metadata/states/{state_id}"
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/demand/{demand_id}"
+                resp = await client.put(
+                    url,
+                    json={
+                        "state": {
+                            "meta": {
+                                "href": state_href,
+                                "type": "state",
+                                "mediaType": "application/json",
+                            }
+                        }
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            raise DemandAPIError(
+                "Ошибка HTTP при обновлении статуса отгрузки",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # pragma: no cover
+            raise DemandAPIError(
+                "Ошибка при обновлении статуса отгрузки",
+                details={"error": str(exc)},
+            ) from exc

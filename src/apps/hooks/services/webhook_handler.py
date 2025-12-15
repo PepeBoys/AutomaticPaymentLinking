@@ -47,8 +47,9 @@ class WebhookHandler:
                 payment.agent_id,
             )
 
+            linked_documents = []
             if subscription.link_type == LinkType.counterparty:
-                document, linked_sum = await self._link_payment_by_counterparty(
+                document, linked_sum, linked_documents = await self._link_payment_by_counterparty(
                     payment=payment,
                     document_type=subscription.document_type,
                     prioritize_oldest=(
@@ -66,6 +67,8 @@ class WebhookHandler:
                     ),
                 )
                 linked_sum = payment.sum if document else 0
+                if document:
+                    linked_documents = [document]
 
             if not document or linked_sum <= 0:
                 logger.warning(
@@ -75,6 +78,9 @@ class WebhookHandler:
                     payment.sum,
                     subscription.link_type,
                     subscription.document_type,
+                )
+                await self._apply_payment_state(
+                    payment.id, subscription.payment_status_on_failure
                 )
                 return {
                     "success": False,
@@ -94,6 +100,15 @@ class WebhookHandler:
                 subscription.document_type.value,
                 document.name,
                 payment.sum,
+            )
+
+            await self._apply_payment_state(
+                payment.id, subscription.payment_status_on_success
+            )
+            await self._apply_document_states(
+                linked_documents,
+                subscription.document_type,
+                subscription.document_status_on_success,
             )
 
             response = {
@@ -120,6 +135,10 @@ class WebhookHandler:
             DemandNotFoundError,
         ) as exc:
             logger.warning("Документ для платежа %s не найден: %s", event_href, exc)
+            await self._apply_payment_state(
+                payment.id if 'payment' in locals() else None,
+                subscription.payment_status_on_failure,
+            )
             return {"success": False, "message": "Документ для привязки не найден"}
         except Exception as exc:  # pragma: no cover - защитный блок
             logger.exception("Ошибка при обработке платежа: %s", str(exc))
@@ -176,10 +195,11 @@ class WebhookHandler:
         )
 
         if not documents:
-            return None, 0
+            return None, 0, []
 
         remaining_sum = payment.sum
         last_linked_document = None
+        linked_documents: list = []
 
         for document in documents:
             unpaid_amount = document.get_unpaid_amount()
@@ -209,12 +229,38 @@ class WebhookHandler:
 
             remaining_sum -= linked_sum
             last_linked_document = document
+            linked_documents.append(document)
 
             if remaining_sum <= 0:
                 break
 
         total_linked = payment.sum - remaining_sum
-        return last_linked_document, total_linked
+        return last_linked_document, total_linked, linked_documents
+
+    async def _apply_payment_state(self, payment_id: str | None, state_id: str | None) -> None:
+        """Применить статус к платежу, если задан."""
+
+        if payment_id and state_id:
+            await self.paymentin_service.update_state(payment_id, state_id)
+
+    async def _apply_document_states(
+        self,
+        documents: list,
+        document_type: DocumentType,
+        state_id: str | None,
+    ) -> None:
+        """Применить статус ко всем найденным документам."""
+
+        if not state_id or not documents:
+            return
+
+        for document in documents:
+            if document_type == DocumentType.customerorder:
+                await self.customerorder_service.update_state(document.id, state_id)
+            elif document_type == DocumentType.invoiceout:
+                await self.invoiceout_service.update_state(document.id, state_id)
+            elif document_type == DocumentType.demand:
+                await self.demand_service.update_state(document.id, state_id)
 
     async def _get_documents_by_counterparty(
         self, payment, document_type: DocumentType, prioritize_oldest: bool

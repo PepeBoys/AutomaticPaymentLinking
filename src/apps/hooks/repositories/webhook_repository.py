@@ -125,6 +125,10 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         link_type: LinkType,
         document_priority: DocumentPriority,
         payment_purpose_mask: str | None,
+        payment_status_on_success: str | None,
+        payment_status_on_failure: str | None,
+        document_status_on_success: str | None,
+        document_status_on_failure: str | None,
     ) -> Optional[WebhookEntity]:
         """
         Обновить настройки привязки для существующего вебхука.
@@ -143,30 +147,34 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         ).order_by(WebhookSubscription.id.desc())
         result = await self._session.execute(stmt)
         model = result.scalars().first()
-        
+
         if not model:
             return None
-        
+
         model.document_type = document_type
         model.link_type = link_type
         model.document_priority = document_priority
         model.payment_purpose_mask = payment_purpose_mask
-        
+        model.payment_status_on_success = payment_status_on_success
+        model.payment_status_on_failure = payment_status_on_failure
+        model.document_status_on_success = document_status_on_success
+        model.document_status_on_failure = document_status_on_failure
+
         await self._session.flush()
         await self._session.refresh(model)
         
         return self._to_entity(model)
-    
+
     async def get_status_dict(self) -> Dict[str, bool]:
         """
         Получить словарь статусов всех вебхуков.
-        
+
         Returns:
             Словарь {payment_type: enabled}
         """
         webhooks = await self.get_all()
         return {webhook.payment_type.value: webhook.enabled for webhook in webhooks}
-    
+
     async def get_full_status_dict(self) -> Dict[str, Dict[str, str]]:
         """
         Получить полный словарь статусов всех вебхуков с настройками.
@@ -197,6 +205,10 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "link_type": model.link_type.value,
                     "document_priority": model.document_priority.value,
                     "payment_purpose_mask": model.payment_purpose_mask,
+                    "payment_status_on_success": model.payment_status_on_success,
+                    "payment_status_on_failure": model.payment_status_on_failure,
+                    "document_status_on_success": model.document_status_on_success,
+                    "document_status_on_failure": model.document_status_on_failure,
                 }
             else:
                 result[pt.value] = {
@@ -205,20 +217,24 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "link_type": LinkType.sum_and_counterparty.value,
                     "document_priority": DocumentPriority.oldest_first.value,
                     "payment_purpose_mask": None,
+                    "payment_status_on_success": None,
+                    "payment_status_on_failure": None,
+                    "document_status_on_success": None,
+                    "document_status_on_failure": None,
                 }
-        
+
         return result
-    
+
     async def add(self, entity: WebhookEntity) -> WebhookEntity:
         """
         Добавить новый вебхук.
-        
+
         Args:
             entity: Сущность вебхука
-            
+
         Returns:
             Добавленная сущность
-            
+
         Raises:
             RepositoryError: При ошибке добавления
         """
@@ -233,17 +249,17 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                 "Ошибка при добавлении вебхука",
                 details={"error": str(exc)},
             ) from exc
-    
+
     async def update(self, entity: WebhookEntity) -> WebhookEntity:
         """
         Обновить существующий вебхук.
-        
+
         Args:
             entity: Сущность вебхука
-            
+
         Returns:
             Обновленная сущность
-            
+
         Raises:
             RepositoryError: При ошибке обновления
         """
@@ -253,12 +269,12 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             )
             result = await self._session.execute(stmt)
             model = result.scalar_one_or_none()
-            
+
             if not model:
                 raise RepositoryError(
                     f"Вебхук с ms_webhook_id={entity.ms_webhook_id} не найден"
                 )
-            
+
             model.payment_type = entity.payment_type
             model.entity_type = entity.entity_type
             model.action = entity.action
@@ -269,7 +285,12 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             model.document_type = entity.document_type
             model.link_type = entity.link_type
             model.document_priority = entity.document_priority
-            
+            model.payment_purpose_mask = entity.payment_purpose_mask
+            model.payment_status_on_success = entity.payment_status_on_success
+            model.payment_status_on_failure = entity.payment_status_on_failure
+            model.document_status_on_success = entity.document_status_on_success
+            model.document_status_on_failure = entity.document_status_on_failure
+
             await self._session.flush()
             await self._session.refresh(model)
             return self._to_entity(model)
@@ -348,18 +369,22 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             link_type=model.link_type,
             document_priority=model.document_priority,
             payment_purpose_mask=model.payment_purpose_mask,
+            payment_status_on_success=model.payment_status_on_success,
+            payment_status_on_failure=model.payment_status_on_failure,
+            document_status_on_success=model.document_status_on_success,
+            document_status_on_failure=model.document_status_on_failure,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
-    
+
     @staticmethod
     def _to_model(entity: WebhookEntity) -> WebhookSubscription:
         """
         Преобразовать доменную сущность в модель БД.
-        
+
         Args:
             entity: Доменная сущность
-            
+
         Returns:
             Модель SQLAlchemy
         """
@@ -377,4 +402,8 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             link_type=entity.link_type,
             document_priority=entity.document_priority,
             payment_purpose_mask=entity.payment_purpose_mask,
+            payment_status_on_success=entity.payment_status_on_success,
+            payment_status_on_failure=entity.payment_status_on_failure,
+            document_status_on_success=entity.document_status_on_success,
+            document_status_on_failure=entity.document_status_on_failure,
         )
