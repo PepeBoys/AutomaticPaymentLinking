@@ -67,7 +67,6 @@ class WebhookService:
                 payment_status_on_success=data.get("payment_status_on_success"),
                 payment_status_on_failure=data.get("payment_status_on_failure"),
                 document_status_on_success=data.get("document_status_on_success"),
-                document_status_on_failure=data.get("document_status_on_failure"),
                 transfer_project_to_payment=data.get(
                     "transfer_project_to_payment", False
                 ),
@@ -89,7 +88,6 @@ class WebhookService:
         payment_status_on_success: str | None,
         payment_status_on_failure: str | None,
         document_status_on_success: str | None,
-        document_status_on_failure: str | None,
         transfer_project_to_payment: bool,
         check_document_organization: bool,
     ) -> Dict[str, str]:
@@ -113,7 +111,6 @@ class WebhookService:
             payment_status_on_success=payment_status_on_success,
             payment_status_on_failure=payment_status_on_failure,
             document_status_on_success=document_status_on_success,
-            document_status_on_failure=document_status_on_failure,
             transfer_project_to_payment=transfer_project_to_payment,
             check_document_organization=check_document_organization,
         )
@@ -147,7 +144,6 @@ class WebhookService:
             "payment_status_on_success": payment_status_on_success,
             "payment_status_on_failure": payment_status_on_failure,
             "document_status_on_success": document_status_on_success,
-            "document_status_on_failure": document_status_on_failure,
             "transfer_project_to_payment": transfer_project_to_payment,
             "check_document_organization": check_document_organization,
         }
@@ -163,7 +159,6 @@ class WebhookService:
         payment_status_on_success: str | None = None,
         payment_status_on_failure: str | None = None,
         document_status_on_success: str | None = None,
-        document_status_on_failure: str | None = None,
         transfer_project_to_payment: bool = False,
         check_document_organization: bool = False,
     ) -> WebhookOperationResult:
@@ -222,7 +217,6 @@ class WebhookService:
                 result.webhook_entity.payment_status_on_success = payment_status_on_success
                 result.webhook_entity.payment_status_on_failure = payment_status_on_failure
                 result.webhook_entity.document_status_on_success = document_status_on_success
-                result.webhook_entity.document_status_on_failure = document_status_on_failure
                 result.webhook_entity.transfer_project_to_payment = (
                     transfer_project_to_payment
                 )
@@ -260,7 +254,6 @@ class WebhookService:
                     existing_db_entity.payment_status_on_success = payment_status_on_success
                     existing_db_entity.payment_status_on_failure = payment_status_on_failure
                     existing_db_entity.document_status_on_success = document_status_on_success
-                    existing_db_entity.document_status_on_failure = document_status_on_failure
                     existing_db_entity.transfer_project_to_payment = (
                         transfer_project_to_payment
                     )
