@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from ..ms_auth.services.auth_service import MySkladAuthService, get_ms_auth_service
+from ..ms_auth.dependencies import get_ms_auth_service
+from ..ms_auth.services.auth_service import MySkladAuthService
 from .services.supply_service import SupplyService
 
 
