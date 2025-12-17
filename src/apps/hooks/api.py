@@ -112,7 +112,7 @@ async def update_link_settings(
     service: WebhookSvcDep,
 ):
     logger.info(
-        "Обновление настроек привязки: payment_type=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, transfer_project=%s, check_org=%s",
+        "Обновление настроек привязки: payment_type=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, doc_success=%s, transfer_project=%s, check_org=%s",
         payload.payment_type,
         payload.document_type,
         payload.link_type,
@@ -144,7 +144,7 @@ async def update_link_settings(
 @router.post("/auto-link-toggle")
 async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDep):
     logger.info(
-        "UI toggle: payment_type=%s, enabled=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, transfer_project=%s, check_org=%s",
+        "UI toggle: payment_type=%s, enabled=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, doc_success=%s, transfer_project=%s, check_org=%s",
         payload.payment_type,
         payload.enabled,
         payload.document_type,

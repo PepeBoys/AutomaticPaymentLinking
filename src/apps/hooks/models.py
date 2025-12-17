@@ -55,6 +55,10 @@ class WebhookSubscription(Base):
         String(64),
         nullable=True,
     )
+    payment_status_on_failure = Column(
+        String(64),
+        nullable=True,
+    )
 
     document_status_on_success = Column(
         String(64),

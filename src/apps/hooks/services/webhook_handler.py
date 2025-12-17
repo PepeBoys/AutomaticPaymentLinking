@@ -123,7 +123,9 @@ class WebhookHandler:
                     subscription.document_type,
                 )
                 await self._apply_payment_state(
-                    payment_service, payment.id, subscription.payment_status_on_failure
+                    payment_service,
+                    payment.id,
+                    subscription.payment_status_on_failure,
                 )
                 return {
                     "success": False,
@@ -200,7 +202,7 @@ class WebhookHandler:
             logger.warning("Документ для %s %s не найден: %s", payment_label, event_href, exc)
             await self._apply_payment_state(
                 payment_service,
-                payment.id if "payment" in locals() else None,
+                getattr(payment, "id", None),
                 subscription.payment_status_on_failure,
             )
             return {"success": False, "message": "Документ для привязки не найден"}
