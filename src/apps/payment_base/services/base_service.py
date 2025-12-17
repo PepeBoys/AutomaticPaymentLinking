@@ -84,6 +84,15 @@ class BasePaymentService(Generic[TEntity, TClient], ABC):
         updated_data = await self._client.update_project(payment_id, project_href)
         return self._to_entity(updated_data)
 
+    async def update_sales_channel(
+        self, payment_id: str, sales_channel_href: str
+    ) -> TEntity:
+        """Обновить канал продаж платежа."""
+        updated_data = await self._client.update_sales_channel(
+            payment_id, sales_channel_href
+        )
+        return self._to_entity(updated_data)
+
     @staticmethod
     def _extract_type_from_href(href: str) -> str:
         """Извлечь тип документа из href."""

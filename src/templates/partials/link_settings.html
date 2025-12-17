@@ -184,6 +184,24 @@
                 </span>
             </span>
         </label>
+        {% if payment_type in ["incoming_payment", "incoming_order"] %}
+        <label class="check option" style="margin-bottom: 8px;">
+            <input
+                class="check__input js-transfer-sales-channel"
+                type="checkbox"
+                name="transfer_sales_channel_{{ payment_type }}"
+                data-payment-type="{{ payment_type }}"
+            >
+            <span class="check__box"></span>
+            <span class="check__text">
+                Переносить канал продаж
+                <span class="help-tip" tabindex="0">
+                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-tooltip">Копирует канал продаж из найденного документа в созданный платеж.</span>
+                </span>
+            </span>
+        </label>
+        {% endif %}
         <label class="check option">
             <input
                 class="check__input js-check-organization"

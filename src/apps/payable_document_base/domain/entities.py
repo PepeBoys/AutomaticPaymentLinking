@@ -20,6 +20,7 @@ class BasePayableDocumentEntity:
     organization_id: str
     meta_href: str
     project_meta_href: str | None = None
+    sales_channel_meta_href: str | None = None
     shipped_sum: Optional[float] = None
     invoiced_sum: Optional[float] = None
 

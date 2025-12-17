@@ -240,6 +240,7 @@
             const maskInput = tab.querySelector('.js-payment-purpose-mask');
             const statusSelects = tab.querySelectorAll('select');
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+            const transferSalesChannelCheckbox = tab.querySelector('.js-transfer-sales-channel');
             const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
             const saveButton = tab.querySelector('.js-save-settings');
 
@@ -251,6 +252,7 @@
             if (maskInput) maskInput.disabled = shouldDisable;
             statusSelects.forEach(select => select.disabled = shouldDisable);
             if (transferProjectCheckbox) transferProjectCheckbox.disabled = shouldDisable;
+            if (transferSalesChannelCheckbox) transferSalesChannelCheckbox.disabled = shouldDisable;
             if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = shouldDisable;
             if (saveButton) saveButton.disabled = shouldDisable;
         }
@@ -269,6 +271,7 @@
                 const maskInput = tab.querySelector('.js-payment-purpose-mask');
                 const statusSelects = tab.querySelectorAll('select');
                 const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+                const transferSalesChannelCheckbox = tab.querySelector('.js-transfer-sales-channel');
                 const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
 
                 documentRadios.forEach(radio => radio.disabled = disabled);
@@ -278,6 +281,7 @@
                 if (maskInput) maskInput.disabled = disabled;
                 statusSelects.forEach(select => select.disabled = disabled);
                 if (transferProjectCheckbox) transferProjectCheckbox.disabled = disabled;
+                if (transferSalesChannelCheckbox) transferSalesChannelCheckbox.disabled = disabled;
                 if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = disabled;
                 if (saveButton) saveButton.disabled = disabled;
             } else {
@@ -311,6 +315,7 @@
             const paymentFailureSelect = tab.querySelector('.js-payment-failure-status');
             const documentSuccessSelect = tab.querySelector('.js-document-success-status');
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+            const transferSalesChannelCheckbox = tab.querySelector('.js-transfer-sales-channel');
             const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
 
             return {
@@ -322,6 +327,7 @@
                 payment_status_on_failure: paymentFailureSelect ? paymentFailureSelect.value || null : null,
                 document_status_on_success: documentSuccessSelect ? documentSuccessSelect.value || null : null,
                 transfer_project_to_payment: transferProjectCheckbox ? transferProjectCheckbox.checked : false,
+                transfer_sales_channel_to_payment: transferSalesChannelCheckbox ? transferSalesChannelCheckbox.checked : false,
                 check_document_organization: checkOrganizationCheckbox ? checkOrganizationCheckbox.checked : false,
             };
         }
@@ -345,10 +351,16 @@
             }
 
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
+            const transferSalesChannelCheckbox = tab.querySelector('.js-transfer-sales-channel');
             const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
             if (transferProjectCheckbox) {
                 const cachedValue = webhookStatusCache[paymentType]?.transfer_project_to_payment;
                 transferProjectCheckbox.checked = Boolean(cachedValue);
+            }
+
+            if (transferSalesChannelCheckbox) {
+                const cachedSalesChannel = webhookStatusCache[paymentType]?.transfer_sales_channel_to_payment;
+                transferSalesChannelCheckbox.checked = Boolean(cachedSalesChannel);
             }
 
             if (checkOrganizationCheckbox) {
@@ -521,6 +533,7 @@
                     payment_status_on_failure: settings.payment_status_on_failure,
                     document_status_on_success: settings.document_status_on_success,
                     transfer_project_to_payment: settings.transfer_project_to_payment,
+                    transfer_sales_channel_to_payment: settings.transfer_sales_channel_to_payment,
                     check_document_organization: settings.check_document_organization,
                 })
             })
@@ -576,6 +589,7 @@
                     payment_status_on_failure: settings.payment_status_on_failure,
                     document_status_on_success: settings.document_status_on_success,
                     transfer_project_to_payment: settings.transfer_project_to_payment,
+                    transfer_sales_channel_to_payment: settings.transfer_sales_channel_to_payment,
                     check_document_organization: settings.check_document_organization,
                 })
             })
