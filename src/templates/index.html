@@ -203,6 +203,34 @@
             });
         }
 
+        function applyCachedStatusPlaceholders(paymentType, webhookData) {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+            if (!tab || !webhookData) return;
+
+            const paymentSuccessSelect = tab.querySelector('.js-payment-success-status');
+            const paymentFailureSelect = tab.querySelector('.js-payment-failure-status');
+            const documentSuccessSelect = tab.querySelector('.js-document-success-status');
+
+            [
+                { select: paymentSuccessSelect, value: webhookData.payment_status_on_success },
+                { select: paymentFailureSelect, value: webhookData.payment_status_on_failure },
+                { select: documentSuccessSelect, value: webhookData.document_status_on_success },
+            ].forEach(({ select, value }) => {
+                if (!select || !value) return;
+
+                const existingOption = select.querySelector(`option[value="${value}"]`);
+
+                if (!existingOption) {
+                    const placeholderOption = document.createElement('option');
+                    placeholderOption.value = value;
+                    placeholderOption.textContent = 'Загрузка статусов...';
+                    select.appendChild(placeholderOption);
+                }
+
+                select.value = value;
+            });
+        }
+
         function updateTabControlsState(paymentType, enabled) {
             const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
             if (!tab) return;
@@ -421,11 +449,11 @@
                 .then(data => {
                     checkboxes.forEach((checkbox) => {
                         const paymentType = checkbox.dataset.paymentType;
-                        const webhookData = data.webhooks[paymentType];
+                    const webhookData = data.webhooks[paymentType];
 
-                        if (webhookData) {
-                            checkbox.checked = webhookData.enabled;
-                            webhookStatusCache[paymentType] = webhookData;
+                    if (webhookData) {
+                        checkbox.checked = webhookData.enabled;
+                        webhookStatusCache[paymentType] = webhookData;
 
                             const documentPriority = webhookData.document_priority || 'oldest_first';
 
@@ -436,6 +464,8 @@
                                 documentPriority,
                                 webhookData.payment_purpose_mask
                             );
+
+                            applyCachedStatusPlaceholders(paymentType, webhookData);
 
                             if (['incoming_payment', 'incoming_order', 'outgoing_payment', 'outgoing_order'].includes(paymentType)) {
                                 loadStatuses(paymentType);
