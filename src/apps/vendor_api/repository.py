@@ -17,18 +17,27 @@ class VendorAccountRepository:
         return result.scalar_one_or_none()
 
     async def upsert_account(
-        self, *, account_id: str, access_token: str, app_uid: str | None = None
+        self,
+        *,
+        account_id: str,
+        access_token: str,
+        base_url: str | None = None,
+        app_uid: str | None = None,
     ) -> VendorAccount:
         account = await self.get_by_account_id(account_id)
         if account:
             account.access_token = access_token
             account.is_active = True
+            account.base_url = base_url or account.base_url
             account.app_uid = app_uid or account.app_uid
             await self._session.flush()
             return account
 
         account = VendorAccount(
-            account_id=account_id, access_token=access_token, app_uid=app_uid
+            account_id=account_id,
+            access_token=access_token,
+            base_url=base_url,
+            app_uid=app_uid,
         )
         self._session.add(account)
         await self._session.flush()
@@ -43,6 +52,15 @@ class VendorAccountRepository:
         account.access_token = None
         await self._session.flush()
         return account
+
+    async def list_active_accounts(self, *, limit: int | None = None) -> list[VendorAccount]:
+        stmt = select(VendorAccount).where(VendorAccount.is_active.is_(True))
+
+        if limit:
+            stmt = stmt.limit(limit)
+
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
 
 
 class VendorJtiRepository:

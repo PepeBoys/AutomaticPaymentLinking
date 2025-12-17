@@ -48,6 +48,7 @@ class VendorApiService:
         await self._accounts.upsert_account(
             account_id=account_id,
             access_token=access_token,
+            base_url=base_url,
             app_uid=settings.ms_app_uid,
         )
 
