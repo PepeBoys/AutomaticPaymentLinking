@@ -671,5 +671,81 @@
         cursor: not-allowed;
         background-color: #f5f5f5;
     }
+
+    .help-tip {
+        position: relative;
+        display: inline-flex;
+        vertical-align: middle;
+        margin-left: 6px;
+        cursor: pointer;
+    }
+
+    .help-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 12px;
+        line-height: 1;
+        border: 1px solid #c7d2fe;
+        transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .help-tip:focus .help-icon,
+    .help-tip:hover .help-icon {
+        background: #e0e7ff;
+        color: #312e81;
+        border-color: #a5b4fc;
+        outline: none;
+    }
+
+    .help-tip:focus-visible {
+        outline: 2px solid #a5b4fc;
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+
+    .help-tooltip {
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: 220px;
+        max-width: 280px;
+        padding: 10px 12px;
+        border-radius: 6px;
+        background: #111827;
+        color: #f9fafb;
+        font-size: 12px;
+        line-height: 1.4;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s ease, visibility 0.2s ease;
+        z-index: 10;
+        pointer-events: none;
+    }
+
+    .help-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 6px;
+        border-style: solid;
+        border-color: #111827 transparent transparent transparent;
+    }
+
+    .help-tip:hover .help-tooltip,
+    .help-tip:focus .help-tooltip,
+    .help-tip:focus-visible .help-tooltip {
+        opacity: 1;
+        visibility: visible;
+    }
 </style>
 {% endblock %}
