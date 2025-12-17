@@ -64,3 +64,34 @@ async def get_ms_auth_service(
 
 
 AuthSvcDep = Annotated[MySkladAuthService, Depends(get_ms_auth_service)]
+
+
+async def get_ms_auth_service_for_account(
+    account_id: str, session: AsyncSession = Depends(get_session)
+) -> MySkladAuthService:
+    """Загрузить auth-контекст строго для указанного account_id.
+
+    Используется в вендорских эндпоинтах, где account_id передаётся в path и
+    нужно исключить привязку к "дефолтному" аккаунту при мультитенантной работе.
+    """
+
+    auth_service = build_ms_auth_service()
+    repo = VendorAccountRepository(session)
+    account = await repo.get_by_account_id(account_id)
+
+    if not account or not account.is_active or not account.access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Account is not activated or missing access token. "
+                "Please re-run app activation."
+            ),
+        )
+
+    auth_service.set_access_token(
+        account.access_token,
+        base_url=settings.ms_base_url,
+        account_id=account.account_id,
+    )
+
+    return auth_service

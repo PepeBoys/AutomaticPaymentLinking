@@ -18,6 +18,10 @@ class VendorAccount(Base):
         String(1024),
         nullable=True,
     )
+    base_url: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+    )
     app_uid: Mapped[str | None] = mapped_column(
         String(256),
         nullable=True,
