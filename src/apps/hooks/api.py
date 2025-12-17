@@ -112,14 +112,13 @@ async def update_link_settings(
     service: WebhookSvcDep,
 ):
     logger.info(
-        "Обновление настроек привязки: payment_type=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, transfer_project=%s, check_org=%s",
+        "Обновление настроек привязки: payment_type=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, doc_success=%s, transfer_project=%s, check_org=%s",
         payload.payment_type,
         payload.document_type,
         payload.link_type,
         payload.document_priority,
         payload.payment_purpose_mask,
         payload.payment_status_on_success,
-        payload.payment_status_on_failure,
         payload.document_status_on_success,
         payload.transfer_project_to_payment,
         payload.check_document_organization,
@@ -132,7 +131,6 @@ async def update_link_settings(
         document_priority=payload.document_priority,
         payment_purpose_mask=payload.payment_purpose_mask,
         payment_status_on_success=payload.payment_status_on_success,
-        payment_status_on_failure=payload.payment_status_on_failure,
         document_status_on_success=payload.document_status_on_success,
         transfer_project_to_payment=payload.transfer_project_to_payment,
         check_document_organization=payload.check_document_organization,
@@ -144,7 +142,7 @@ async def update_link_settings(
 @router.post("/auto-link-toggle")
 async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDep):
     logger.info(
-        "UI toggle: payment_type=%s, enabled=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, pay_fail=%s, doc_success=%s, transfer_project=%s, check_org=%s",
+        "UI toggle: payment_type=%s, enabled=%s, document_type=%s, link_type=%s, priority=%s, mask=%s, pay_success=%s, doc_success=%s, transfer_project=%s, check_org=%s",
         payload.payment_type,
         payload.enabled,
         payload.document_type,
@@ -152,7 +150,6 @@ async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDe
         payload.document_priority,
         payload.payment_purpose_mask,
         payload.payment_status_on_success,
-        payload.payment_status_on_failure,
         payload.document_status_on_success,
         payload.transfer_project_to_payment,
         payload.check_document_organization,
@@ -166,7 +163,6 @@ async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDe
         document_priority=payload.document_priority,
         payment_purpose_mask=payload.payment_purpose_mask,
         payment_status_on_success=payload.payment_status_on_success,
-        payment_status_on_failure=payload.payment_status_on_failure,
         document_status_on_success=payload.document_status_on_success,
         transfer_project_to_payment=payload.transfer_project_to_payment,
         check_document_organization=payload.check_document_organization,
