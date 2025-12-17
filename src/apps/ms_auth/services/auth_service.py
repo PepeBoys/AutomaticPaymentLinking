@@ -17,6 +17,7 @@ class MySkladAuthService:
         self._credentials: Optional[MySkladCredentials] = None
         self._access_token: Optional[str] = None
         self._base_url: Optional[str] = None
+        self._account_id: Optional[str] = None
         self._load_from_env()
     
     def _load_from_env(self) -> None:
@@ -93,15 +94,24 @@ class MySkladAuthService:
 
         raise ValueError("Base URL is not configured")
 
-    def set_access_token(self, token: str, *, base_url: str | None = None) -> None:
+    def set_access_token(
+        self,
+        token: str,
+        *,
+        base_url: str | None = None,
+        account_id: str | None = None,
+    ) -> None:
         """Установить access token для работы по OAuth/Vendor API."""
 
         self._access_token = token
         if base_url:
             self._base_url = base_url
+        if account_id:
+            self._account_id = account_id
 
     def clear_access_token(self) -> None:
         self._access_token = None
+        self._account_id = None
     
     def get_basic_auth_header(self) -> Optional[dict]:
         """Получить заголовок Authorization (Basic или Bearer)."""
@@ -116,6 +126,11 @@ class MySkladAuthService:
         auth_header = BasicAuthHeader(token=self._credentials.get_basic_auth_token())
 
         return auth_header.to_dict()
+
+    def get_account_id(self) -> Optional[str]:
+        """Текущий accountId, связанный с активным токеном."""
+
+        return self._account_id
 
 
 _auth_service = MySkladAuthService()

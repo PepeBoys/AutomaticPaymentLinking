@@ -101,3 +101,11 @@ def _apply_manual_migrations(sync_conn) -> None:
         for column_name, ddl in new_status_columns.items():
             if column_name not in columns:
                 sync_conn.exec_driver_sql(ddl)
+
+        existing_indexes = {index["name"] for index in inspector.get_indexes("webhooksubscriptions")}
+
+        if "ix_webhook_account_payment" not in existing_indexes:
+            sync_conn.exec_driver_sql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_webhook_account_payment "
+                "ON webhooksubscriptions (ms_account_id, payment_type)"
+            )

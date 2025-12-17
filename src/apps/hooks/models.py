@@ -21,7 +21,7 @@ class WebhookSubscription(Base):
 
     ms_webhook_id = Column(String(64), unique=True, nullable=False, index=True)
     ms_href = Column(String(512), nullable=True)
-    ms_account_id = Column(String(64), nullable=True)
+    ms_account_id = Column(String(64), nullable=True, index=True)
 
     enabled = Column(Boolean, nullable=False, default=True, index=True)
 
@@ -101,5 +101,11 @@ class WebhookSubscription(Base):
             "entity_type",
             "action",
             "url",
+        ),
+        Index(
+            "ix_webhook_account_payment",
+            "ms_account_id",
+            "payment_type",
+            unique=True,
         ),
     )
