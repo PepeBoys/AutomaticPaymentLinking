@@ -1,4 +1,3 @@
-<!-- path: src/templates/index.html -->
 {% extends "base.html" %}
 
 {% block content %}
@@ -309,6 +308,7 @@
             const documentPriorityRadio = tab.querySelector('.js-document-priority:checked');
             const maskInput = tab.querySelector('.js-payment-purpose-mask');
             const paymentSuccessSelect = tab.querySelector('.js-payment-success-status');
+            const paymentFailureSelect = tab.querySelector('.js-payment-failure-status');
             const documentSuccessSelect = tab.querySelector('.js-document-success-status');
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
             const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
@@ -319,6 +319,7 @@
                 document_priority: documentPriorityRadio ? documentPriorityRadio.value : 'oldest_first',
                 payment_purpose_mask: maskInput ? maskInput.value.trim() : null,
                 payment_status_on_success: paymentSuccessSelect ? paymentSuccessSelect.value || null : null,
+                payment_status_on_failure: paymentFailureSelect ? paymentFailureSelect.value || null : null,
                 document_status_on_success: documentSuccessSelect ? documentSuccessSelect.value || null : null,
                 transfer_project_to_payment: transferProjectCheckbox ? transferProjectCheckbox.checked : false,
                 check_document_organization: checkOrganizationCheckbox ? checkOrganizationCheckbox.checked : false,
@@ -423,6 +424,14 @@
                     );
 
                     populateStatusSelect(
+                        paymentFailureSelect,
+                        data.payment_states,
+                        cached.payment_status_on_failure,
+                        'Статусы не найдены',
+                        paymentHint
+                    );
+
+                    populateStatusSelect(
                         documentSuccessSelect,
                         data.document_states,
                         cached.document_status_on_success,
@@ -449,11 +458,11 @@
                 .then(data => {
                     checkboxes.forEach((checkbox) => {
                         const paymentType = checkbox.dataset.paymentType;
-                    const webhookData = data.webhooks[paymentType];
+                        const webhookData = data.webhooks[paymentType];
 
-                    if (webhookData) {
-                        checkbox.checked = webhookData.enabled;
-                        webhookStatusCache[paymentType] = webhookData;
+                        if (webhookData) {
+                            checkbox.checked = webhookData.enabled;
+                            webhookStatusCache[paymentType] = webhookData;
 
                             const documentPriority = webhookData.document_priority || 'oldest_first';
 
@@ -509,6 +518,7 @@
                     document_priority: settings.document_priority,
                     payment_purpose_mask: settings.payment_purpose_mask,
                     payment_status_on_success: settings.payment_status_on_success,
+                    payment_status_on_failure: settings.payment_status_on_failure,
                     document_status_on_success: settings.document_status_on_success,
                     transfer_project_to_payment: settings.transfer_project_to_payment,
                     check_document_organization: settings.check_document_organization,
@@ -563,6 +573,7 @@
                     document_priority: settings.document_priority,
                     payment_purpose_mask: settings.payment_purpose_mask,
                     payment_status_on_success: settings.payment_status_on_success,
+                    payment_status_on_failure: settings.payment_status_on_failure,
                     document_status_on_success: settings.document_status_on_success,
                     transfer_project_to_payment: settings.transfer_project_to_payment,
                     check_document_organization: settings.check_document_organization,

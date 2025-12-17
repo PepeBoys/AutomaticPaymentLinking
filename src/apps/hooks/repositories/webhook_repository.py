@@ -126,6 +126,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         document_priority: DocumentPriority,
         payment_purpose_mask: str | None,
         payment_status_on_success: str | None,
+        payment_status_on_failure: str | None,
         document_status_on_success: str | None,
         transfer_project_to_payment: bool,
         check_document_organization: bool,
@@ -156,6 +157,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         model.document_priority = document_priority
         model.payment_purpose_mask = payment_purpose_mask
         model.payment_status_on_success = payment_status_on_success
+        model.payment_status_on_failure = payment_status_on_failure
         model.document_status_on_success = document_status_on_success
         model.transfer_project_to_payment = transfer_project_to_payment
         model.check_document_organization = check_document_organization
@@ -206,6 +208,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "document_priority": model.document_priority.value,
                     "payment_purpose_mask": model.payment_purpose_mask,
                     "payment_status_on_success": model.payment_status_on_success,
+                    "payment_status_on_failure": model.payment_status_on_failure,
                     "document_status_on_success": model.document_status_on_success,
                     "transfer_project_to_payment": model.transfer_project_to_payment,
                     "check_document_organization": model.check_document_organization,
@@ -218,6 +221,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "document_priority": DocumentPriority.oldest_first.value,
                     "payment_purpose_mask": None,
                     "payment_status_on_success": None,
+                    "payment_status_on_failure": None,
                     "document_status_on_success": None,
                     "transfer_project_to_payment": False,
                     "check_document_organization": False,
@@ -287,6 +291,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             model.document_priority = entity.document_priority
             model.payment_purpose_mask = entity.payment_purpose_mask
             model.payment_status_on_success = entity.payment_status_on_success
+            model.payment_status_on_failure = entity.payment_status_on_failure
             model.document_status_on_success = entity.document_status_on_success
             model.transfer_project_to_payment = entity.transfer_project_to_payment
             model.check_document_organization = entity.check_document_organization
@@ -370,6 +375,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             document_priority=model.document_priority,
             payment_purpose_mask=model.payment_purpose_mask,
             payment_status_on_success=model.payment_status_on_success,
+            payment_status_on_failure=model.payment_status_on_failure,
             document_status_on_success=model.document_status_on_success,
             transfer_project_to_payment=model.transfer_project_to_payment,
             check_document_organization=model.check_document_organization,
@@ -403,6 +409,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             document_priority=entity.document_priority,
             payment_purpose_mask=entity.payment_purpose_mask,
             payment_status_on_success=entity.payment_status_on_success,
+            payment_status_on_failure=entity.payment_status_on_failure,
             document_status_on_success=entity.document_status_on_success,
             transfer_project_to_payment=entity.transfer_project_to_payment,
             check_document_organization=entity.check_document_organization,
