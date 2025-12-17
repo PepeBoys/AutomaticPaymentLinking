@@ -11,7 +11,7 @@ from .services.auth_service import MySkladAuthService, build_ms_auth_service
 
 
 async def get_ms_auth_service(
-    account_id: str | None = Header(default=None, alias="X-Account-Id"),
+    account_header_id: str | None = Header(default=None, alias="X-Account-Id"),
     session: AsyncSession = Depends(get_session),
 ) -> MySkladAuthService:
     """Загрузить auth-контекст для конкретного аккаунта.
@@ -26,11 +26,11 @@ async def get_ms_auth_service(
 
     auth_service = build_ms_auth_service()
 
-    if not account_id:
+    if not account_header_id:
         return auth_service
 
     repo = VendorAccountRepository(session)
-    account = await repo.get_by_account_id(account_id)
+    account = await repo.get_by_account_id(account_header_id)
 
     if not account or not account.is_active or not account.access_token:
         raise HTTPException(
