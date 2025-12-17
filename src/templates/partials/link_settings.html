@@ -61,7 +61,13 @@
                 checked
             >
             <span class="radio__box"></span>
-            <span class="radio__text">По сумме и контрагенту</span>
+            <span class="radio__text">
+                По сумме и контрагенту
+                <span class="help-tip" tabindex="0">
+                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-tooltip">Совпадают и сумма платежа, и контрагент в документе.</span>
+                </span>
+            </span>
         </label>
         <label class="radio option" style="margin-bottom: 8px;">
             <input
@@ -72,7 +78,13 @@
                 data-payment-type="{{ payment_type }}"
             >
             <span class="radio__box"></span>
-            <span class="radio__text">Только по контрагенту</span>
+            <span class="radio__text">
+                Только по контрагенту
+                <span class="help-tip" tabindex="0">
+                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-tooltip">Находит документ по совпадению контрагента, сумму не проверяет.</span>
+                </span>
+            </span>
         </label>
         <label class="radio option" style="margin-bottom: 8px;">
             <input
@@ -83,7 +95,13 @@
                 data-payment-type="{{ payment_type }}"
             >
             <span class="radio__box"></span>
-            <span class="radio__text">По шаблону назначения платежа</span>
+            <span class="radio__text">
+                По шаблону назначения платежа
+                <span class="help-tip" tabindex="0">
+                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-tooltip">Сравнивает назначение платежа с указанной маской и переменными.</span>
+                </span>
+            </span>
         </label>
 
         <div
@@ -158,7 +176,13 @@
                 data-payment-type="{{ payment_type }}"
             >
             <span class="check__box"></span>
-            <span class="check__text">Переносить проект в платеж</span>
+            <span class="check__text">
+                Переносить проект в платеж
+                <span class="help-tip" tabindex="0">
+                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-tooltip">Копирует проект из найденного документа в созданный платеж.</span>
+                </span>
+            </span>
         </label>
         <label class="check option">
             <input
@@ -168,7 +192,13 @@
                 data-payment-type="{{ payment_type }}"
             >
             <span class="check__box"></span>
-            <span class="check__text">Проверять организацию в документе</span>
+            <span class="check__text">
+                Проверять организацию в документе
+                <span class="help-tip" tabindex="0">
+                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-tooltip">Связывает только если организация в документе совпадает с платежом.</span>
+                </span>
+            </span>
         </label>
     </div>
 
@@ -187,10 +217,22 @@
                 Статус платежа
             </label>
             <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center;">
-                <span class="caption" style="font-size: 11px;">Привязка успешна</span>
+                <span class="caption" style="font-size: 11px;">
+                    Привязка успешна
+                    <span class="help-tip" tabindex="0">
+                        <span class="help-icon" aria-hidden="true">❔</span>
+                        <span class="help-tooltip">Статус, который установим платежу после успешной привязки.</span>
+                    </span>
+                </span>
                 <div class="js-payment-success-status-container" data-payment-type="{{ payment_type }}"></div>
-                
-                <span class="caption" style="font-size: 11px;">Не удалось связать</span>
+
+                <span class="caption" style="font-size: 11px;">
+                    Не удалось связать
+                    <span class="help-tip" tabindex="0">
+                        <span class="help-icon" aria-hidden="true">❔</span>
+                        <span class="help-tooltip">Статус, который ставим платежу, если подходящий документ не найден.</span>
+                    </span>
+                </span>
                 <div class="js-payment-failure-status-container" data-payment-type="{{ payment_type }}"></div>
             </div>
             <div class="caption js-payment-status-hint" style="color: #ef4444; margin-top: 6px; font-size: 11px; display: none;">
@@ -203,7 +245,13 @@
                 Статус документа
             </label>
             <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center;">
-                <span class="caption" style="font-size: 11px;">Привязка успешна</span>
+                <span class="caption" style="font-size: 11px;">
+                    Привязка успешна
+                    <span class="help-tip" tabindex="0">
+                        <span class="help-icon" aria-hidden="true">❔</span>
+                        <span class="help-tooltip">Статус документа, который присваиваем при успешной привязке платежа.</span>
+                    </span>
+                </span>
                 <div class="js-document-success-status-container" data-payment-type="{{ payment_type }}"></div>
             </div>
             <div class="caption js-document-status-hint" style="color: #ef4444; margin-top: 6px; font-size: 11px; display: none;">
@@ -212,5 +260,15 @@
         </div>
     </div>
     {% endif %}
+
+    <div class="settings-actions" style="margin-top: 24px; display: flex; justify-content: flex-end;">
+        <button
+            type="button"
+            class="ui-button ui-button--primary js-save-settings"
+            data-payment-type="{{ payment_type }}"
+        >
+            Сохранить
+        </button>
+    </div>
 
 </div>
