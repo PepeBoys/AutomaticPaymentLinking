@@ -7,8 +7,8 @@ from src.apps.hooks.services.webhook_service import WebhookService
 from src.apps.hooks.uow.unit_of_work import UnitOfWork
 from src.apps.ms_auth.services.auth_service import (
     MySkladAuthService,
-    get_ms_auth_service,
 )
+from src.apps.ms_auth.dependencies import get_ms_auth_service
 from src.core.database import get_session
 
 from .services import VendorApiService
