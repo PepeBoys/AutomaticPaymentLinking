@@ -214,3 +214,44 @@ class BasePaymentClient(ABC):
                 "Ошибка при обновлении проекта платежа",
                 details={"error": str(exc)},
             ) from exc
+
+    async def update_sales_channel(
+        self, payment_id: str, sales_channel_href: str
+    ) -> Dict[str, Any]:
+        """Обновить канал продаж платежа."""
+
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/{self.entity_type}/{payment_id}"
+                logger.debug(
+                    "Обновление канала продаж платежа: %s -> %s",
+                    payment_id,
+                    sales_channel_href,
+                )
+
+                payload = {
+                    "salesChannel": {
+                        "meta": {
+                            "href": sales_channel_href,
+                            "type": "saleschannel",
+                            "mediaType": "application/json",
+                        }
+                    }
+                }
+
+                resp = await client.put(url, json=payload)
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            raise PaymentAPIError(
+                "Ошибка HTTP при обновлении канала продаж платежа",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            raise PaymentAPIError(
+                "Ошибка при обновлении канала продаж платежа",
+                details={"error": str(exc)},
+            ) from exc

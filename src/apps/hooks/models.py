@@ -76,6 +76,13 @@ class WebhookSubscription(Base):
         server_default="false",
     )
 
+    transfer_sales_channel_to_payment = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
     check_document_organization = Column(
         Boolean,
         nullable=False,

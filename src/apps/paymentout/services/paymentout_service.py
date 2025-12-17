@@ -35,6 +35,11 @@ class PaymentOutService(BasePaymentService[PaymentOutEntity, BasePaymentClient])
         project_meta = data.get("project", {}).get("meta", {})
         project_href = project_meta.get("href") if project_meta else None
 
+        sales_channel_meta = data.get("salesChannel", {}).get("meta", {})
+        sales_channel_href = (
+            sales_channel_meta.get("href") if sales_channel_meta else None
+        )
+
         linked_ops = [
             {
                 "meta": {
@@ -59,4 +64,5 @@ class PaymentOutService(BasePaymentService[PaymentOutEntity, BasePaymentClient])
             linked_operations=linked_ops,
             meta_href=data["meta"]["href"],
             project_meta_href=project_href,
+            sales_channel_meta_href=sales_channel_href,
         )

@@ -70,6 +70,9 @@ class WebhookService:
                 transfer_project_to_payment=data.get(
                     "transfer_project_to_payment", False
                 ),
+                transfer_sales_channel_to_payment=data.get(
+                    "transfer_sales_channel_to_payment", False
+                ),
                 check_document_organization=data.get(
                     "check_document_organization", False
                 ),
@@ -89,6 +92,7 @@ class WebhookService:
         payment_status_on_failure: str | None,
         document_status_on_success: str | None,
         transfer_project_to_payment: bool,
+        transfer_sales_channel_to_payment: bool,
         check_document_organization: bool,
     ) -> Dict[str, str]:
         """
@@ -112,6 +116,7 @@ class WebhookService:
             payment_status_on_failure=payment_status_on_failure,
             document_status_on_success=document_status_on_success,
             transfer_project_to_payment=transfer_project_to_payment,
+            transfer_sales_channel_to_payment=transfer_sales_channel_to_payment,
             check_document_organization=check_document_organization,
         )
 
@@ -145,6 +150,7 @@ class WebhookService:
             "payment_status_on_failure": payment_status_on_failure,
             "document_status_on_success": document_status_on_success,
             "transfer_project_to_payment": transfer_project_to_payment,
+            "transfer_sales_channel_to_payment": transfer_sales_channel_to_payment,
             "check_document_organization": check_document_organization,
         }
 
@@ -160,6 +166,7 @@ class WebhookService:
         payment_status_on_failure: str | None = None,
         document_status_on_success: str | None = None,
         transfer_project_to_payment: bool = False,
+        transfer_sales_channel_to_payment: bool = False,
         check_document_organization: bool = False,
     ) -> WebhookOperationResult:
         webhook_url = settings.ms_webhook_url
@@ -220,6 +227,9 @@ class WebhookService:
                 result.webhook_entity.transfer_project_to_payment = (
                     transfer_project_to_payment
                 )
+                result.webhook_entity.transfer_sales_channel_to_payment = (
+                    transfer_sales_channel_to_payment
+                )
                 result.webhook_entity.check_document_organization = (
                     check_document_organization
                 )
@@ -256,6 +266,9 @@ class WebhookService:
                     existing_db_entity.document_status_on_success = document_status_on_success
                     existing_db_entity.transfer_project_to_payment = (
                         transfer_project_to_payment
+                    )
+                    existing_db_entity.transfer_sales_channel_to_payment = (
+                        transfer_sales_channel_to_payment
                     )
                     existing_db_entity.check_document_organization = (
                         check_document_organization

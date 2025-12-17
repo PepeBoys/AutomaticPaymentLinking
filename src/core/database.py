@@ -94,6 +94,7 @@ def _apply_manual_migrations(sync_conn) -> None:
             "payment_status_on_failure": "ALTER TABLE webhooksubscriptions ADD COLUMN payment_status_on_failure VARCHAR(64)",
             "document_status_on_failure": "ALTER TABLE webhooksubscriptions ADD COLUMN document_status_on_failure VARCHAR(64)",
             "transfer_project_to_payment": "ALTER TABLE webhooksubscriptions ADD COLUMN transfer_project_to_payment BOOLEAN DEFAULT FALSE",
+            "transfer_sales_channel_to_payment": "ALTER TABLE webhooksubscriptions ADD COLUMN transfer_sales_channel_to_payment BOOLEAN DEFAULT FALSE",
             "check_document_organization": "ALTER TABLE webhooksubscriptions ADD COLUMN check_document_organization BOOLEAN DEFAULT FALSE",
         }
 

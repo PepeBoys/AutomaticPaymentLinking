@@ -21,3 +21,4 @@ class BasePaymentEntity:
     linked_operations: list[dict]
     meta_href: str
     project_meta_href: Optional[str] = None
+    sales_channel_meta_href: Optional[str] = None

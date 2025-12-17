@@ -147,6 +147,14 @@ class WebhookHandler:
                 payment_label=payment_label,
             )
 
+            await self._apply_sales_channel_from_document(
+                payment_service=payment_service,
+                payment_id=payment.id,
+                document=document,
+                transfer_sales_channel=subscription.transfer_sales_channel_to_payment,
+                payment_label=payment_label,
+            )
+
             logger.info(
                 "✓ %s %s привязан к %s %s (сумма: %s)",
                 payment_label.capitalize(),
@@ -425,6 +433,47 @@ class WebhookHandler:
         except Exception as exc:  # pragma: no cover - сетевые ошибки
             logger.warning(
                 "Не удалось перенести проект в %s %s: %s",
+                payment_label,
+                payment_id,
+                exc,
+            )
+
+    async def _apply_sales_channel_from_document(
+        self,
+        payment_service,
+        payment_id: str,
+        document,
+        transfer_sales_channel: bool,
+        payment_label: str,
+    ) -> None:
+        """Перенести канал продаж из документа в платеж при необходимости."""
+
+        if not transfer_sales_channel:
+            return
+
+        sales_channel_href = (
+            getattr(document, "sales_channel_meta_href", None) if document else None
+        )
+
+        if not sales_channel_href:
+            logger.info(
+                "Канал продаж не перенесен для %s %s: у документа нет канала продаж",
+                payment_label,
+                payment_id,
+            )
+            return
+
+        try:
+            await payment_service.update_sales_channel(payment_id, sales_channel_href)
+            logger.info(
+                "✓ Канал продаж перенесен в %s %s из документа %s",
+                payment_label,
+                payment_id,
+                document.name if document else "",
+            )
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            logger.warning(
+                "Не удалось перенести канал продаж в %s %s: %s",
                 payment_label,
                 payment_id,
                 exc,
