@@ -12,7 +12,7 @@
         <div style="display: flex; gap: 16px; flex-wrap: wrap;">
             {% set document_options = [
                 {"value": "customerorder", "label": "Заказ покупателя"},
-                {"value": "invoiceout", "label": "Счет"},
+                {"value": "invoiceout", "label": "Счет покупателя"},
                 {"value": "demand", "label": "Отгрузка"},
             ] %}
 
@@ -64,7 +64,7 @@
             <span class="radio__text">
                 По сумме и контрагенту
                 <span class="help-tip" tabindex="0">
-                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-icon" aria-hidden="true">?</span>
                     <span class="help-tooltip">Совпадают и сумма платежа, и контрагент в документе.</span>
                 </span>
             </span>
@@ -81,7 +81,7 @@
             <span class="radio__text">
                 Только по контрагенту
                 <span class="help-tip" tabindex="0">
-                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-icon" aria-hidden="true">?</span>
                     <span class="help-tooltip">Находит документ по совпадению контрагента, сумму не проверяет.</span>
                 </span>
             </span>
@@ -98,7 +98,7 @@
             <span class="radio__text">
                 По шаблону назначения платежа
                 <span class="help-tip" tabindex="0">
-                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-icon" aria-hidden="true">?</span>
                     <span class="help-tooltip">Сравнивает назначение платежа с указанной маской и переменными.</span>
                 </span>
             </span>
@@ -179,7 +179,7 @@
             <span class="check__text">
                 Переносить проект в платеж
                 <span class="help-tip" tabindex="0">
-                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-icon" aria-hidden="true">?</span>
                     <span class="help-tooltip">Копирует проект из найденного документа в созданный платеж.</span>
                 </span>
             </span>
@@ -196,7 +196,7 @@
             <span class="check__text">
                 Переносить канал продаж
                 <span class="help-tip" tabindex="0">
-                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-icon" aria-hidden="true">?</span>
                     <span class="help-tooltip">Копирует канал продаж из найденного документа в созданный платеж.</span>
                 </span>
             </span>
@@ -213,7 +213,7 @@
             <span class="check__text">
                 Проверять организацию в документе
                 <span class="help-tip" tabindex="0">
-                    <span class="help-icon" aria-hidden="true">❔</span>
+                    <span class="help-icon" aria-hidden="true">?</span>
                     <span class="help-tooltip">Связывает только если организация в документе совпадает с платежом.</span>
                 </span>
             </span>
@@ -238,7 +238,7 @@
                 <span class="caption" style="font-size: 11px;">
                     Привязка успешна
                     <span class="help-tip" tabindex="0">
-                        <span class="help-icon" aria-hidden="true">❔</span>
+                        <span class="help-icon" aria-hidden="true">?</span>
                         <span class="help-tooltip">Статус, который установим платежу после успешной привязки.</span>
                     </span>
                 </span>
@@ -247,7 +247,7 @@
                 <span class="caption" style="font-size: 11px;">
                     Не удалось связать
                     <span class="help-tip" tabindex="0">
-                        <span class="help-icon" aria-hidden="true">❔</span>
+                        <span class="help-icon" aria-hidden="true">?</span>
                         <span class="help-tooltip">Статус, который ставим платежу, если подходящий документ не найден.</span>
                     </span>
                 </span>
@@ -266,7 +266,7 @@
                 <span class="caption" style="font-size: 11px;">
                     Привязка успешна
                     <span class="help-tip" tabindex="0">
-                        <span class="help-icon" aria-hidden="true">❔</span>
+                        <span class="help-icon" aria-hidden="true">?</span>
                         <span class="help-tooltip">Статус документа, который присваиваем при успешной привязке платежа.</span>
                     </span>
                 </span>
