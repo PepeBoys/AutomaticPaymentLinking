@@ -40,7 +40,6 @@ class AutoLinkTogglePayload(BaseModel):
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
     payment_purpose_mask: Optional[str] = None
     payment_status_on_success: Optional[str] = None
-    payment_status_on_failure: Optional[str] = None
     document_status_on_success: Optional[str] = None
     transfer_project_to_payment: bool = False
     check_document_organization: bool = False
@@ -53,7 +52,6 @@ class UpdateLinkSettingsPayload(BaseModel):
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
     payment_purpose_mask: Optional[str] = None
     payment_status_on_success: Optional[str] = None
-    payment_status_on_failure: Optional[str] = None
     document_status_on_success: Optional[str] = None
     transfer_project_to_payment: bool = False
     check_document_organization: bool = False
@@ -66,7 +64,6 @@ class WebhookStatusItem(BaseModel):
     document_priority: Optional[DocumentPriority] = DocumentPriority.oldest_first
     payment_purpose_mask: Optional[str] = None
     payment_status_on_success: Optional[str] = None
-    payment_status_on_failure: Optional[str] = None
     document_status_on_success: Optional[str] = None
     transfer_project_to_payment: bool = False
     check_document_organization: bool = False
