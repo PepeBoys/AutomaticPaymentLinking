@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from .dependencies import AuthHeader, get_vendor_service
+from .dependencies import AuthHeader, get_vendor_activation_service, get_vendor_service
 from .schemas import ActivationPayload, ActivationResponse, VendorEventPayload
 from .services import VendorApiService
 
@@ -17,7 +17,7 @@ async def activate_solution(
     account_id: str,
     payload: ActivationPayload,
     authorization: AuthHeader,
-    service: VendorApiService = Depends(get_vendor_service),
+    service: VendorApiService = Depends(get_vendor_activation_service),
 ):
     print(f"[app_id] -> {app_id}")
     print(f"[account_id] -> {account_id}")
