@@ -3,10 +3,8 @@ from typing import Annotated
 from fastapi import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.apps.ms_auth.services.auth_service import (
-    MySkladAuthService,
-    get_ms_auth_service,
-)
+from src.apps.ms_auth.dependencies import get_ms_auth_service
+from src.apps.ms_auth.services.auth_service import MySkladAuthService
 from src.core.database import get_session
 
 from .services.webhook_service import WebhookService
