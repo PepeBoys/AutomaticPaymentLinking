@@ -40,20 +40,24 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         
         return self._to_entity(model) if model else None
     
-    async def get_all(self) -> List[WebhookEntity]:
+    async def get_all(self, account_id: str) -> List[WebhookEntity]:
         """
         Получить все вебхуки.
         
         Returns:
             Список сущностей вебхуков
         """
-        stmt = select(WebhookSubscription)
+        stmt = select(WebhookSubscription).where(
+            WebhookSubscription.ms_account_id == account_id
+        )
         result = await self._session.execute(stmt)
         models = result.scalars().all()
         
         return [self._to_entity(model) for model in models]
     
-    async def get_by_ms_webhook_id(self, ms_webhook_id: str) -> Optional[WebhookEntity]:
+    async def get_by_ms_webhook_id(
+        self, ms_webhook_id: str, account_id: str | None = None
+    ) -> Optional[WebhookEntity]:
         """
         Получить вебхук по ID МойСклад.
         
@@ -63,15 +67,20 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         Returns:
             Сущность вебхука или None
         """
-        stmt = select(WebhookSubscription).where(
-            WebhookSubscription.ms_webhook_id == ms_webhook_id
-        )
+        filters = [WebhookSubscription.ms_webhook_id == ms_webhook_id]
+
+        if account_id:
+            filters.append(WebhookSubscription.ms_account_id == account_id)
+
+        stmt = select(WebhookSubscription).where(*filters)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         
         return self._to_entity(model) if model else None
     
-    async def get_by_payment_type(self, payment_type: PaymentType) -> Optional[WebhookEntity]:
+    async def get_by_payment_type(
+        self, payment_type: PaymentType, account_id: str
+    ) -> Optional[WebhookEntity]:
         """
         Получить вебхук по типу платежа.
         
@@ -81,9 +90,14 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         Returns:
             Сущность вебхука или None
         """
-        stmt = select(WebhookSubscription).where(
-            WebhookSubscription.payment_type == payment_type
-        ).order_by(WebhookSubscription.id.desc())
+        stmt = (
+            select(WebhookSubscription)
+            .where(
+                WebhookSubscription.payment_type == payment_type,
+                WebhookSubscription.ms_account_id == account_id,
+            )
+            .order_by(WebhookSubscription.id.desc())
+        )
         result = await self._session.execute(stmt)
         model = result.scalars().first()
         
@@ -131,6 +145,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         transfer_project_to_payment: bool,
         transfer_sales_channel_to_payment: bool,
         check_document_organization: bool,
+        account_id: str,
     ) -> Optional[WebhookEntity]:
         """
         Обновить настройки привязки для существующего вебхука.
@@ -143,10 +158,15 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         Returns:
             Обновленная сущность или None если вебхук не найден
         """
-        stmt = select(WebhookSubscription).where(
-            WebhookSubscription.payment_type == payment_type,
-            WebhookSubscription.enabled == True,
-        ).order_by(WebhookSubscription.id.desc())
+        stmt = (
+            select(WebhookSubscription)
+            .where(
+                WebhookSubscription.payment_type == payment_type,
+                WebhookSubscription.enabled == True,
+                WebhookSubscription.ms_account_id == account_id,
+            )
+            .order_by(WebhookSubscription.id.desc())
+        )
         result = await self._session.execute(stmt)
         model = result.scalars().first()
 
@@ -169,17 +189,17 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         
         return self._to_entity(model)
 
-    async def get_status_dict(self) -> Dict[str, bool]:
+    async def get_status_dict(self, account_id: str) -> Dict[str, bool]:
         """
         Получить словарь статусов всех вебхуков.
 
         Returns:
             Словарь {payment_type: enabled}
         """
-        webhooks = await self.get_all()
+        webhooks = await self.get_all(account_id)
         return {webhook.payment_type.value: webhook.enabled for webhook in webhooks}
 
-    async def get_full_status_dict(self) -> Dict[str, Dict[str, str]]:
+    async def get_full_status_dict(self, account_id: str) -> Dict[str, Dict[str, str]]:
         """
         Получить полный словарь статусов всех вебхуков с настройками.
         
@@ -196,9 +216,14 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         result = {}
         
         for pt in all_payment_types:
-            stmt = select(WebhookSubscription).where(
-                WebhookSubscription.payment_type == pt
-            ).order_by(WebhookSubscription.id.desc())
+            stmt = (
+                select(WebhookSubscription)
+                .where(
+                    WebhookSubscription.payment_type == pt,
+                    WebhookSubscription.ms_account_id == account_id,
+                )
+                .order_by(WebhookSubscription.id.desc())
+            )
             query_result = await self._session.execute(stmt)
             model = query_result.scalars().first()
             
@@ -324,7 +349,9 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         Returns:
             Сущность вебхука
         """
-        existing = await self.get_by_ms_webhook_id(entity.ms_webhook_id)
+        existing = await self.get_by_ms_webhook_id(
+            entity.ms_webhook_id, entity.ms_account_id
+        )
         
         if existing:
             entity.id = existing.id

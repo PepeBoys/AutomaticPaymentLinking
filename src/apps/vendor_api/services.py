@@ -52,7 +52,9 @@ class VendorApiService:
         )
 
         # 5) configure MS auth for this request context
-        self._auth_service.set_access_token(access_token, base_url=base_url)
+        self._auth_service.set_access_token(
+            access_token, base_url=base_url, account_id=account_id
+        )
 
         # 6) enable required webhooks in MS
         await self._enable_required_webhooks()

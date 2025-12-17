@@ -8,7 +8,7 @@ from src.core.config import settings
 from ...ms_auth.services.auth_service import MySkladAuthService
 from ..domain.entities import WebhookOperationResult
 from ..domain.value_objects import WebhookConfiguration
-from ..exceptions import MissingRequestIdError
+from ..exceptions import MissingRequestIdError, WebhookConfigurationError
 from ..schemas import (
     DocumentPriority,
     DocumentType,
@@ -46,15 +46,26 @@ class WebhookService:
         self._uow = uow
         self._auth_service = auth_service
         self._client = MoySkladClient(auth_service)
+
+    def _require_account_id(self) -> str:
+        account_id = self._auth_service.get_account_id()
+
+        if not account_id:
+            raise WebhookConfigurationError(
+                "AccountId не найден. Активируйте приложение через Vendor API"
+            )
+
+        return account_id
     
     async def get_webhooks_status(self) -> Dict[str, WebhookStatusItem]:
         """
         Получить статус всех вебхуков с настройками.
-        
+
         Returns:
             Словарь {payment_type: WebhookStatusItem}
         """
-        full_status = await self._uow.webhooks.get_full_status_dict()
+        account_id = self._require_account_id()
+        full_status = await self._uow.webhooks.get_full_status_dict(account_id)
         
         result = {}
         for payment_type, data in full_status.items():
@@ -106,6 +117,7 @@ class WebhookService:
         Returns:
             Результат операции
         """
+        account_id = self._require_account_id()
         updated = await self._uow.webhooks.update_link_settings(
             payment_type=payment_type,
             document_type=document_type,
@@ -118,6 +130,7 @@ class WebhookService:
             transfer_project_to_payment=transfer_project_to_payment,
             transfer_sales_channel_to_payment=transfer_sales_channel_to_payment,
             check_document_organization=check_document_organization,
+            account_id=account_id,
         )
 
         if not updated:
@@ -169,6 +182,7 @@ class WebhookService:
         transfer_sales_channel_to_payment: bool = False,
         check_document_organization: bool = False,
     ) -> WebhookOperationResult:
+        account_id = self._require_account_id()
         webhook_url = settings.ms_webhook_url
         
         if not webhook_url:
@@ -196,7 +210,9 @@ class WebhookService:
             webhook_url=webhook_url,
         )
 
-        existing_db_entity = await self._uow.webhooks.get_by_payment_type(payment_type)
+        existing_db_entity = await self._uow.webhooks.get_by_payment_type(
+            payment_type, account_id
+        )
         
         operation = WebhookOperationFactory.create_operation(
             enabled=enabled,
@@ -217,6 +233,9 @@ class WebhookService:
         if result.success:
             if result.webhook_entity:
                 result.webhook_entity.payment_type = payment_type
+                result.webhook_entity.ms_account_id = (
+                    result.webhook_entity.ms_account_id or account_id
+                )
                 result.webhook_entity.document_type = document_type
                 result.webhook_entity.link_type = link_type
                 result.webhook_entity.document_priority = document_priority
@@ -247,7 +266,9 @@ class WebhookService:
 
                 result.details["db_record_id"] = saved_entity.id
             else:
-                existing_db_entity = await self._uow.webhooks.get_by_payment_type(payment_type)
+                existing_db_entity = await self._uow.webhooks.get_by_payment_type(
+                    payment_type, account_id
+                )
 
                 if existing_db_entity:
                     logger.info(
@@ -257,6 +278,7 @@ class WebhookService:
                         payment_type.value,
                     )
                     existing_db_entity.enabled = enabled
+                    existing_db_entity.ms_account_id = account_id
                     existing_db_entity.document_type = document_type
                     existing_db_entity.link_type = link_type
                     existing_db_entity.document_priority = document_priority
