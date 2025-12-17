@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from ..cashin.dependencies import CashInSvcDep
 from ..cashout.dependencies import CashOutSvcDep
@@ -12,7 +12,11 @@ from ..paymentin.dependencies import PaymentInSvcDep
 from ..paymentout.dependencies import PaymentOutSvcDep
 from ..purchaseorder.dependencies import PurchaseOrderSvcDep
 from ..supply.dependencies import SupplySvcDep
-from .dependencies import RequestIdQuery, WebhookSvcDep
+from .dependencies import (
+    RequestIdQuery,
+    WebhookSvcDep,
+    set_request_account_from_webhook,
+)
 from .schemas import (
     AutoLinkTogglePayload,
     DocumentType,
@@ -209,6 +213,7 @@ async def receive_moysklad_webhook(
     invoicein_service: InvoiceInSvcDep,
     supply_service: SupplySvcDep,
     request_id: RequestIdQuery = None,
+    _: None = Depends(set_request_account_from_webhook),
 ) -> Response:
     logger.info(
         "Получен вебхук МойСклад: requestId=%s, events=%d, uid=%s, moment=%s",

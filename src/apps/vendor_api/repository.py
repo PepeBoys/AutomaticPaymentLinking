@@ -44,6 +44,15 @@ class VendorAccountRepository:
         await self._session.flush()
         return account
 
+    async def list_active_accounts(self, *, limit: int | None = None) -> list[VendorAccount]:
+        stmt = select(VendorAccount).where(VendorAccount.is_active.is_(True))
+
+        if limit:
+            stmt = stmt.limit(limit)
+
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
 
 class VendorJtiRepository:
     def __init__(self, session: AsyncSession) -> None:
