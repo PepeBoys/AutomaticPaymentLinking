@@ -133,9 +133,14 @@ class MySkladAuthService:
         return self._account_id
 
 
-_auth_service = MySkladAuthService()
+def build_ms_auth_service() -> MySkladAuthService:
+    """Factory для создания независимого экземпляра сервиса аутентификации.
 
+    Ранее использовался синглтон с общим состоянием access_token/account_id,
+    что делало невозможной работу нескольких аккаунтов одновременно: новый
+    вызов activate_app перезаписывал токен прошлого клиента. Теперь каждый
+    запрос получает свежий экземпляр, и контекст (account_id, base_url,
+    access_token) задаётся в зависимостях на основе конкретного аккаунта.
+    """
 
-def get_ms_auth_service() -> MySkladAuthService:
-    """Dependency для получения сервиса аутентификации."""
-    return _auth_service
+    return MySkladAuthService()
