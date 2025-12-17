@@ -122,6 +122,11 @@ class WebhookHandler:
                     subscription.link_type,
                     subscription.document_type,
                 )
+                await self._apply_payment_state(
+                    payment_service,
+                    payment.id,
+                    subscription.payment_status_on_failure,
+                )
                 return {
                     "success": False,
                     "message": "Не найден подходящий документ для привязки",
@@ -195,6 +200,11 @@ class WebhookHandler:
             SupplyNotFoundError,
         ) as exc:
             logger.warning("Документ для %s %s не найден: %s", payment_label, event_href, exc)
+            await self._apply_payment_state(
+                payment_service,
+                getattr(payment, "id", None),
+                subscription.payment_status_on_failure,
+            )
             return {"success": False, "message": "Документ для привязки не найден"}
         except Exception as exc:  # pragma: no cover - защитный блок
             logger.exception("Ошибка при обработке %s: %s", payment_label, str(exc))
