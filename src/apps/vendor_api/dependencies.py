@@ -44,4 +44,14 @@ async def get_vendor_activation_service(
     return VendorApiService(session=session, auth_service=auth_service, webhook_service=webhook_service)
 
 
+async def get_vendor_activation_service(
+    session: AsyncSession = Depends(get_session),
+) -> VendorApiService:
+    """Вендор-сервис для активации, не требующий уже активированного аккаунта."""
+
+    auth_service = build_ms_auth_service()
+    webhook_service = WebhookService(uow=UnitOfWork(session), auth_service=auth_service)
+    return VendorApiService(session=session, auth_service=auth_service, webhook_service=webhook_service)
+
+
 AuthHeader = Annotated[str | None, Header(alias="Authorization")]
