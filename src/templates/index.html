@@ -131,10 +131,8 @@
     document.addEventListener("DOMContentLoaded", function () {
         const checkboxes = document.querySelectorAll(".js-auto-link-toggle");
 
-        const debounceTimers = {};
         const processingFlags = {};
         const webhookStatusCache = {};
-        
         let saveTimeouts = {};
 
         function createSelectElement(className, paymentType) {
@@ -205,19 +203,6 @@
             });
         }
 
-        function debounce(func, delay, key) {
-            return function(...args) {
-                if (debounceTimers[key]) {
-                    clearTimeout(debounceTimers[key]);
-                }
-
-                debounceTimers[key] = setTimeout(() => {
-                    func.apply(this, args);
-                    delete debounceTimers[key];
-                }, delay);
-            };
-        }
-
         function updateTabControlsState(paymentType, enabled) {
             const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
             if (!tab) return;
@@ -229,6 +214,7 @@
             const statusSelects = tab.querySelectorAll('select');
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
             const checkOrganizationCheckbox = tab.querySelector('.js-check-organization');
+            const saveButton = tab.querySelector('.js-save-settings');
 
             const shouldDisable = !enabled;
 
@@ -239,6 +225,7 @@
             statusSelects.forEach(select => select.disabled = shouldDisable);
             if (transferProjectCheckbox) transferProjectCheckbox.disabled = shouldDisable;
             if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = shouldDisable;
+            if (saveButton) saveButton.disabled = shouldDisable;
         }
 
         function setTabControlsDisabled(paymentType, disabled) {
@@ -246,7 +233,8 @@
             if (!tab) return;
 
             const checkbox = tab.querySelector('.js-auto-link-toggle');
-            
+            const saveButton = tab.querySelector('.js-save-settings');
+
             if (disabled) {
                 const documentRadios = tab.querySelectorAll('.js-document-type');
                 const linkRadios = tab.querySelectorAll('.js-link-type');
@@ -264,6 +252,7 @@
                 statusSelects.forEach(select => select.disabled = disabled);
                 if (transferProjectCheckbox) transferProjectCheckbox.disabled = disabled;
                 if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = disabled;
+                if (saveButton) saveButton.disabled = disabled;
             } else {
                 if (checkbox) checkbox.disabled = disabled;
                 updateTabControlsState(paymentType, checkbox ? checkbox.checked : false);
@@ -585,16 +574,6 @@
 
         document.querySelectorAll('.js-document-type, .js-link-type, .js-document-priority').forEach((radio) => {
             const paymentType = radio.dataset.paymentType;
-
-            const debouncedUpdate = debounce(function() {
-                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
-
-                if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
-                    updateLinkSettings(paymentType);
-                }
-            }, 500, `radio_${paymentType}`);
-
-            radio.addEventListener("change", debouncedUpdate);
             radio.addEventListener("change", () => {
                 toggleMaskVisibility(paymentType);
 
@@ -604,73 +583,23 @@
             });
         });
 
-        document.querySelectorAll('.js-payment-purpose-mask').forEach((input) => {
-            const paymentType = input.dataset.paymentType;
-
-            const debouncedMaskUpdate = debounce(function() {
-                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
-                const linkTypeRadio = document.querySelector(`.js-link-type:checked[data-payment-type="${paymentType}"]`);
-
-                if (
-                    checkbox &&
-                    checkbox.checked &&
-                    linkTypeRadio &&
-                    linkTypeRadio.value === 'payment_purpose_mask' &&
-                    !processingFlags[paymentType]
-                ) {
-                    updateLinkSettings(paymentType);
-                }
-            }, 600, `mask_${paymentType}`);
-
-            input.addEventListener('input', debouncedMaskUpdate);
-        });
-
-        document.querySelectorAll('.js-transfer-project').forEach((transferCheckbox) => {
-            const paymentType = transferCheckbox.dataset.paymentType;
-
-            const debouncedTransferUpdate = debounce(function() {
-                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
-
-                if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
-                    updateLinkSettings(paymentType);
-                }
-            }, 300, `transfer_${paymentType}`);
-
-            transferCheckbox.addEventListener('change', debouncedTransferUpdate);
-        });
-
-        document.querySelectorAll('.js-check-organization').forEach((orgCheckbox) => {
-            const paymentType = orgCheckbox.dataset.paymentType;
-
-            const debouncedOrgUpdate = debounce(function() {
-                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
-
-                if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
-                    updateLinkSettings(paymentType);
-                }
-            }, 300, `check_org_${paymentType}`);
-
-            orgCheckbox.addEventListener('change', debouncedOrgUpdate);
-        });
-
         setTimeout(() => {
-            document.addEventListener('change', function(e) {
-                if (e.target.matches('.js-payment-success-status, .js-payment-failure-status, .js-document-success-status')) {
-                    const paymentType = e.target.dataset.paymentType;
-                    const debouncedStatusUpdate = debounce(function() {
-                        const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
-
-                        if (checkbox && checkbox.checked && !processingFlags[paymentType]) {
-                            updateLinkSettings(paymentType);
-                        }
-                    }, 400, `status_${paymentType}_${e.target.className}`);
-                    
-                    debouncedStatusUpdate();
-                }
-            });
-
             loadWebhookStatus();
         }, 100);
+
+        document.querySelectorAll('.js-save-settings').forEach((button) => {
+            const paymentType = button.dataset.paymentType;
+
+            button.addEventListener('click', () => {
+                const checkbox = document.querySelector(`.js-auto-link-toggle[data-payment-type="${paymentType}"]`);
+
+                if (checkbox && checkbox.disabled) {
+                    return;
+                }
+
+                updateLinkSettings(paymentType);
+            });
+        });
     });
 </script>
 
