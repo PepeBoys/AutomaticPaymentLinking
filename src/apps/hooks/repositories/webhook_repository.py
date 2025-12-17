@@ -24,17 +24,21 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         """
         super().__init__(session)
 
-    async def get_by_id(self, entity_id: int) -> Optional[WebhookEntity]:
+    async def get_by_id(self, entity_id: int, account_id: str) -> Optional[WebhookEntity]:
         """
         Получить вебхук по ID.
 
         Args:
             entity_id: ID вебхука
+            account_id: ID аккаунта
             
         Returns:
             Сущность вебхука или None
         """
-        stmt = select(WebhookSubscription).where(WebhookSubscription.id == entity_id)
+        stmt = select(WebhookSubscription).where(
+            WebhookSubscription.id == entity_id,
+            WebhookSubscription.ms_account_id == account_id,
+        )
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         
@@ -42,7 +46,10 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
     
     async def get_all(self, account_id: str) -> List[WebhookEntity]:
         """
-        Получить все вебхуки.
+        Получить все вебхуки для аккаунта.
+        
+        Args:
+            account_id: ID аккаунта
         
         Returns:
             Список сущностей вебхуков
@@ -56,23 +63,22 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         return [self._to_entity(model) for model in models]
     
     async def get_by_ms_webhook_id(
-        self, ms_webhook_id: str, account_id: str | None = None
+        self, ms_webhook_id: str, account_id: str
     ) -> Optional[WebhookEntity]:
         """
         Получить вебхук по ID МойСклад.
         
         Args:
             ms_webhook_id: ID вебхука в МойСклад
+            account_id: ID аккаунта
             
         Returns:
             Сущность вебхука или None
         """
-        filters = [WebhookSubscription.ms_webhook_id == ms_webhook_id]
-
-        if account_id:
-            filters.append(WebhookSubscription.ms_account_id == account_id)
-
-        stmt = select(WebhookSubscription).where(*filters)
+        stmt = select(WebhookSubscription).where(
+            WebhookSubscription.ms_webhook_id == ms_webhook_id,
+            WebhookSubscription.ms_account_id == account_id,
+        )
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         
@@ -86,6 +92,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         
         Args:
             payment_type: Тип платежа
+            account_id: ID аккаунта
             
         Returns:
             Сущность вебхука или None
@@ -154,6 +161,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             payment_type: Тип платежа
             document_type: Тип документа
             link_type: Тип привязки
+            account_id: ID аккаунта
             
         Returns:
             Обновленная сущность или None если вебхук не найден
@@ -193,6 +201,9 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         """
         Получить словарь статусов всех вебхуков.
 
+        Args:
+            account_id: ID аккаунта
+
         Returns:
             Словарь {payment_type: enabled}
         """
@@ -202,6 +213,9 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
     async def get_full_status_dict(self, account_id: str) -> Dict[str, Dict[str, str]]:
         """
         Получить полный словарь статусов всех вебхуков с настройками.
+        
+        Args:
+            account_id: ID аккаунта
         
         Returns:
             Словарь {payment_type: {enabled, document_type, link_type}}
@@ -272,11 +286,19 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             RepositoryError: При ошибке добавления
         """
         try:
+            if not entity.ms_account_id or not entity.ms_account_id.strip():
+                raise RepositoryError(
+                    "ms_account_id is required",
+                    details={"entity": str(entity)},
+                )
+
             model = self._to_model(entity)
             self._session.add(model)
             await self._session.flush()
             await self._session.refresh(model)
             return self._to_entity(model)
+        except RepositoryError:
+            raise
         except Exception as exc:
             raise RepositoryError(
                 "Ошибка при добавлении вебхука",
@@ -297,15 +319,22 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             RepositoryError: При ошибке обновления
         """
         try:
+            if not entity.ms_account_id or not entity.ms_account_id.strip():
+                raise RepositoryError(
+                    "ms_account_id is required",
+                    details={"entity": str(entity)},
+                )
+
             stmt = select(WebhookSubscription).where(
-                WebhookSubscription.ms_webhook_id == entity.ms_webhook_id
+                WebhookSubscription.ms_webhook_id == entity.ms_webhook_id,
+                WebhookSubscription.ms_account_id == entity.ms_account_id,
             )
             result = await self._session.execute(stmt)
             model = result.scalar_one_or_none()
 
             if not model:
                 raise RepositoryError(
-                    f"Вебхук с ms_webhook_id={entity.ms_webhook_id} не найден"
+                    f"Вебхук с ms_webhook_id={entity.ms_webhook_id} и account_id={entity.ms_account_id} не найден"
                 )
 
             model.payment_type = entity.payment_type
@@ -313,7 +342,6 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             model.action = entity.action
             model.url = entity.url
             model.ms_href = entity.ms_href
-            model.ms_account_id = entity.ms_account_id
             model.enabled = entity.enabled
             model.document_type = entity.document_type
             model.link_type = entity.link_type
@@ -349,6 +377,12 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         Returns:
             Сущность вебхука
         """
+        if not entity.ms_account_id or not entity.ms_account_id.strip():
+            raise RepositoryError(
+                "ms_account_id is required for upsert",
+                details={"entity": str(entity)},
+            )
+
         existing = await self.get_by_ms_webhook_id(
             entity.ms_webhook_id, entity.ms_account_id
         )
@@ -359,18 +393,22 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         else:
             return await self.add(entity)
     
-    async def delete(self, entity_id: int) -> None:
+    async def delete(self, entity_id: int, account_id: str) -> None:
         """
         Удалить вебхук по ID.
         
         Args:
             entity_id: ID вебхука
+            account_id: ID аккаунта
             
         Raises:
             RepositoryError: При ошибке удаления
         """
         try:
-            stmt = select(WebhookSubscription).where(WebhookSubscription.id == entity_id)
+            stmt = select(WebhookSubscription).where(
+                WebhookSubscription.id == entity_id,
+                WebhookSubscription.ms_account_id == account_id,
+            )
             result = await self._session.execute(stmt)
             model = result.scalar_one_or_none()
             

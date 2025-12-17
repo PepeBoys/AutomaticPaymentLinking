@@ -89,7 +89,7 @@ class WebhookService:
                 ),
             )
 
-        logger.debug("Статус вебхуков: %s", result)
+        logger.debug("Статус вебхуков для account_id=%s: %s", account_id, result)
         return result
 
     async def update_link_settings(
@@ -135,8 +135,9 @@ class WebhookService:
 
         if not updated:
             logger.warning(
-                "Вебхук %s не найден для обновления настроек",
+                "Вебхук %s не найден для обновления настроек в account_id=%s",
                 payment_type.value,
+                account_id,
             )
             return {
                 "status": "warning",
@@ -146,7 +147,8 @@ class WebhookService:
         await self._uow.commit()
         
         logger.info(
-            "Настройки привязки обновлены: payment_type=%s, document_type=%s, link_type=%s",
+            "Настройки привязки обновлены: account_id=%s, payment_type=%s, document_type=%s, link_type=%s",
+            account_id,
             payment_type.value,
             document_type.value,
             link_type.value,
@@ -224,7 +226,8 @@ class WebhookService:
         result = await operation.execute()
 
         logger.info(
-            "Результат операции: operation=%s, success=%s, has_entity=%s",
+            "Результат операции: account_id=%s, operation=%s, success=%s, has_entity=%s",
+            account_id,
             result.operation,
             result.success,
             result.webhook_entity is not None,
@@ -232,10 +235,10 @@ class WebhookService:
 
         if result.success:
             if result.webhook_entity:
+                if not result.webhook_entity.ms_account_id:
+                    result.webhook_entity.ms_account_id = account_id
+
                 result.webhook_entity.payment_type = payment_type
-                result.webhook_entity.ms_account_id = (
-                    result.webhook_entity.ms_account_id or account_id
-                )
                 result.webhook_entity.document_type = document_type
                 result.webhook_entity.link_type = link_type
                 result.webhook_entity.document_priority = document_priority
@@ -256,7 +259,8 @@ class WebhookService:
                 await self._uow.commit()
 
                 logger.info(
-                    "Webhook сохранен в БД: id=%s, ms_webhook_id=%s, enabled=%s, document_type=%s, link_type=%s",
+                    "Webhook сохранен в БД: account_id=%s, id=%s, ms_webhook_id=%s, enabled=%s, document_type=%s, link_type=%s",
+                    account_id,
                     saved_entity.id,
                     saved_entity.ms_webhook_id,
                     saved_entity.enabled,
@@ -273,12 +277,12 @@ class WebhookService:
                 if existing_db_entity:
                     logger.info(
                         "Webhook entity не вернулась из операции, но найдена в БД. "
-                        "Обновляем enabled=%s для payment_type=%s",
+                        "Обновляем enabled=%s для account_id=%s, payment_type=%s",
                         enabled,
+                        account_id,
                         payment_type.value,
                     )
                     existing_db_entity.enabled = enabled
-                    existing_db_entity.ms_account_id = account_id
                     existing_db_entity.document_type = document_type
                     existing_db_entity.link_type = link_type
                     existing_db_entity.document_priority = document_priority
@@ -299,7 +303,8 @@ class WebhookService:
                     await self._uow.commit()
 
                     logger.info(
-                        "Webhook обновлен в БД: id=%s, enabled=%s",
+                        "Webhook обновлен в БД: account_id=%s, id=%s, enabled=%s",
+                        account_id,
                         saved_entity.id,
                         saved_entity.enabled,
                     )
@@ -307,7 +312,8 @@ class WebhookService:
                     result.details["db_record_id"] = saved_entity.id
                 else:
                     logger.warning(
-                        "Webhook entity не вернулась из операции и не найдена в БД для payment_type=%s",
+                        "Webhook entity не вернулась из операции и не найдена в БД для account_id=%s, payment_type=%s",
+                        account_id,
                         payment_type.value,
                     )
 
@@ -380,11 +386,11 @@ class WebhookService:
         
         for event in payload.events:
             logger.info(
-                "Событие вебхука: type=%s, action=%s, href=%s, accountId=%s, updatedFields=%s",
+                "Событие вебхука: accountId=%s, type=%s, action=%s, href=%s, updatedFields=%s",
+                event.accountId,
                 event.meta.type,
                 event.action,
                 event.meta.href,
-                event.accountId,
                 event.updatedFields,
             )
 
@@ -396,6 +402,15 @@ class WebhookService:
                 )
 
                 if subscription:
+                    if subscription.ms_account_id != event.accountId:
+                        logger.error(
+                            "КРИТИЧЕСКАЯ ОШИБКА: Несоответствие account_id! "
+                            "subscription.ms_account_id=%s, event.accountId=%s",
+                            subscription.ms_account_id,
+                            event.accountId,
+                        )
+                        continue
+
                     result = await handler.handle_paymentin_create(event.meta.href, subscription)
                     logger.info("Результат обработки платежа: success=%s, message=%s", result["success"], result["message"])
                 else:
@@ -408,6 +423,15 @@ class WebhookService:
                 )
 
                 if subscription:
+                    if subscription.ms_account_id != event.accountId:
+                        logger.error(
+                            "КРИТИЧЕСКАЯ ОШИБКА: Несоответствие account_id! "
+                            "subscription.ms_account_id=%s, event.accountId=%s",
+                            subscription.ms_account_id,
+                            event.accountId,
+                        )
+                        continue
+
                     result = await handler.handle_cashin_create(event.meta.href, subscription)
                     logger.info(
                         "Результат обработки приходного ордера: success=%s, message=%s",
@@ -428,6 +452,15 @@ class WebhookService:
                 )
 
                 if subscription:
+                    if subscription.ms_account_id != event.accountId:
+                        logger.error(
+                            "КРИТИЧЕСКАЯ ОШИБКА: Несоответствие account_id! "
+                            "subscription.ms_account_id=%s, event.accountId=%s",
+                            subscription.ms_account_id,
+                            event.accountId,
+                        )
+                        continue
+
                     result = await handler.handle_paymentout_create(
                         event.meta.href, subscription
                     )
@@ -450,6 +483,15 @@ class WebhookService:
                 )
 
                 if subscription:
+                    if subscription.ms_account_id != event.accountId:
+                        logger.error(
+                            "КРИТИЧЕСКАЯ ОШИБКА: Несоответствие account_id! "
+                            "subscription.ms_account_id=%s, event.accountId=%s",
+                            subscription.ms_account_id,
+                            event.accountId,
+                        )
+                        continue
+
                     result = await handler.handle_cashout_create(
                         event.meta.href, subscription
                     )

@@ -21,7 +21,7 @@ class MySkladAuthService:
         self._load_from_env()
     
     def _load_from_env(self) -> None:
-        """Загрузить credentials из переменных окружения."""
+        """Загрузить credentials из переменных окружения (fallback для разработки)."""
         if self._credentials is not None:
             return
         
@@ -30,7 +30,6 @@ class MySkladAuthService:
         base_url = settings.ms_base_url
         
         if login and password:
-            logger.info("Загружены credentials МойСклад из ENV: login=%s", login)
             try:
                 creds_in = MySkladCredentialsIn(
                     login=login,
@@ -46,10 +45,6 @@ class MySkladAuthService:
             except Exception as exc:
                 logger.error("Ошибка валидации credentials из ENV: %s", exc)
                 self._credentials = None
-        else:
-            logger.warning(
-                "Credentials МойСклад не найдены в ENV (APL_MS_LOGIN, APL_MS_PASSWORD)"
-            )
 
     def set_credentials(self, creds: MySkladCredentialsIn) -> None:
         """Установить новые credentials."""
@@ -102,34 +97,34 @@ class MySkladAuthService:
         account_id: str | None = None,
     ) -> None:
         """Установить access token для работы по OAuth/Vendor API."""
-
         self._access_token = token
         if base_url:
             self._base_url = base_url
         if account_id:
             self._account_id = account_id
+            logger.info(
+                "Access token установлен для account_id=%s (auth_mode=Bearer)",
+                account_id,
+            )
 
     def clear_access_token(self) -> None:
         self._access_token = None
         self._account_id = None
     
     def get_basic_auth_header(self) -> Optional[dict]:
-        """Получить заголовок Authorization (Basic или Bearer)."""
-        self._ensure_loaded()
-
+        """Получить заголовок Authorization (Bearer приоритетнее Basic)."""
         if self._access_token:
             return {"Authorization": f"Bearer {self._access_token}"}
 
+        self._ensure_loaded()
         if self._credentials is None:
             return None
         
         auth_header = BasicAuthHeader(token=self._credentials.get_basic_auth_token())
-
         return auth_header.to_dict()
 
     def get_account_id(self) -> Optional[str]:
         """Текущий accountId, связанный с активным токеном."""
-
         return self._account_id
 
 
@@ -142,5 +137,4 @@ def build_ms_auth_service() -> MySkladAuthService:
     запрос получает свежий экземпляр, и контекст (account_id, base_url,
     access_token) задаётся в зависимостях на основе конкретного аккаунта.
     """
-
     return MySkladAuthService()

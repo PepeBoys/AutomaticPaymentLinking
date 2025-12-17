@@ -16,6 +16,7 @@ class WebhookEntity:
     action: str
     url: str
     ms_webhook_id: str
+    ms_account_id: str
     enabled: bool
     document_type: DocumentType = DocumentType.customerorder
     link_type: LinkType = LinkType.sum_and_counterparty
@@ -29,9 +30,13 @@ class WebhookEntity:
     check_document_organization: bool = False
     id: Optional[int] = None
     ms_href: Optional[str] = None
-    ms_account_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    
+    def __post_init__(self):
+        """Валидация после инициализации."""
+        if not self.ms_account_id or not self.ms_account_id.strip():
+            raise ValueError("ms_account_id is required and cannot be empty")
     
     def activate(self) -> None:
         """Активировать вебхук."""

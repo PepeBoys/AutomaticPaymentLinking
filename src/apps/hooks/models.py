@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column
+from sqlalchemy import Boolean, CheckConstraint, Column
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import Index, String
 
@@ -21,7 +21,7 @@ class WebhookSubscription(Base):
 
     ms_webhook_id = Column(String(64), unique=True, nullable=False, index=True)
     ms_href = Column(String(512), nullable=True)
-    ms_account_id = Column(String(64), nullable=True, index=True)
+    ms_account_id = Column(String(64), nullable=False, index=True)
 
     enabled = Column(Boolean, nullable=False, default=True, index=True)
 
@@ -107,5 +107,9 @@ class WebhookSubscription(Base):
             "ms_account_id",
             "payment_type",
             unique=True,
+        ),
+        CheckConstraint(
+            "ms_account_id IS NOT NULL AND ms_account_id != ''",
+            name="ck_webhook_account_id_not_empty",
         ),
     )
