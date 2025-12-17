@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     
     # Webhooks
     ms_webhook_url: str = ""
+
+    # МойСклад Vendor API
+    ms_app_id: str = ""
+    ms_app_uid: str = ""
+    ms_vendor_secret_key: str = ""
+    vendor_api_endpoint_base: str = ""
     
     # Logging
     log_level: str = "INFO"

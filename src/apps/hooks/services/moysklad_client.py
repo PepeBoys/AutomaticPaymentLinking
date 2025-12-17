@@ -39,10 +39,10 @@ class MoySkladClient:
         Raises:
             MoySkladAPIError: Если credentials не настроены
         """
-        creds = self._auth_service.get_raw_credentials()
-        if not creds:
-            raise MoySkladAPIError("МойСклад credentials не настроены")
-        return str(creds.base_url).rstrip("/")
+        try:
+            return self._auth_service.get_base_url()
+        except Exception as exc:
+            raise MoySkladAPIError("МойСклад credentials не настроены") from exc
     
     def _get_headers(self) -> Dict[str, str]:
         """

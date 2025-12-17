@@ -9,17 +9,23 @@
                    maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
 
+    <!-- External libs -->
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/Selectivity.js/2.1.0/selectivity-full.min.css">
-    <link rel="stylesheet"
-          href="{{ url_for('static', path='ms_uikit/css/uikit.css') }}">
-    
+
+    <!-- IMPORTANT:
+         url_for('static', ...) may generate http://... behind a tunnel/proxy,
+         which becomes Mixed Content and gets blocked inside HTTPS iframe.
+         Use relative paths so the browser keeps the current https origin.
+    -->
+    <link rel="stylesheet" href="/static/ms_uikit/css/uikit.css">
+
     <style>
         .link-settings {
             opacity: 1;
             transition: opacity 0.2s ease;
         }
-        
+
         .js-auto-link-toggle:not(:checked) ~ * .link-settings {
             opacity: 0.5;
             pointer-events: none;
@@ -130,7 +136,15 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Selectivity.js/2.1.0/selectivity-full.min.js"></script>
-<script src="{{ url_for('static', path='ms_uikit/js/uikit.js') }}"></script>
+
+<!-- Same Mixed Content fix for JS -->
+<script src="/static/ms_uikit/js/uikit.js"></script>
+
+<!-- Auto-expand iframe inside MoySklad -->
+<script
+  type="text/javascript"
+  src="https://apps-api.moysklad.ru/js/ns/appstore/app/v1/moysklad-iframe-expand-3.js">
+</script>
 
 </body>
 </html>

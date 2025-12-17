@@ -66,6 +66,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Инициализация БД."""
     import src.apps.hooks.models
+    import src.apps.vendor_api.models
 
     from .models import Base
 

@@ -7,6 +7,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from src.apps.cashin.api import router as cashin_router
+from src.apps.cashin.exception_handlers import (
+    EXCEPTION_HANDLERS as CASHIN_EXCEPTION_HANDLERS,
+)
 from src.apps.customerorder.api import router as customerorder_router
 from src.apps.customerorder.exception_handlers import (
     EXCEPTION_HANDLERS as CUSTOMERORDER_EXCEPTION_HANDLERS,
@@ -16,14 +20,11 @@ from src.apps.hooks.exception_handlers import (
     EXCEPTION_HANDLERS as HOOKS_EXCEPTION_HANDLERS,
 )
 from src.apps.ms_auth.api import router as ms_auth_router
-from src.apps.cashin.api import router as cashin_router
-from src.apps.cashin.exception_handlers import (
-    EXCEPTION_HANDLERS as CASHIN_EXCEPTION_HANDLERS,
-)
 from src.apps.paymentin.api import router as paymentin_router
 from src.apps.paymentin.exception_handlers import (
     EXCEPTION_HANDLERS as PAYMENTIN_EXCEPTION_HANDLERS,
 )
+from src.apps.vendor_api.api import router as vendor_api_router
 from src.core.database import init_db
 from src.core.logging_config import setup_logging
 
@@ -70,6 +71,7 @@ async def index(request: Request):
 
 
 app.include_router(ms_auth_router, prefix="/api/auth/ms", tags=["ms_auth"])
+app.include_router(vendor_api_router, prefix="/api", tags=["vendor_api"])
 app.include_router(hooks_router, prefix="/api/hooks", tags=["hooks"])
 app.include_router(customerorder_router, prefix="/api/customerorder", tags=["customerorder"])
 app.include_router(cashin_router, prefix="/api/cashin", tags=["cashin"])

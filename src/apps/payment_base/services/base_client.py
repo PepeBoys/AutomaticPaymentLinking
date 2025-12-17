@@ -26,10 +26,10 @@ class BasePaymentClient(ABC):
         """Тип сущности (paymentin/paymentout/cashin/cashout)."""
 
     def _get_base_url(self) -> str:
-        creds = self._auth_service.get_raw_credentials()
-        if not creds:
-            raise PaymentAPIError("МойСклад credentials не настроены")
-        return str(creds.base_url).rstrip("/")
+        try:
+            return self._auth_service.get_base_url()
+        except Exception as exc:
+            raise PaymentAPIError("МойСклад credentials не настроены") from exc
 
     def _get_headers(self) -> Dict[str, str]:
         auth_header = self._auth_service.get_basic_auth_header()
