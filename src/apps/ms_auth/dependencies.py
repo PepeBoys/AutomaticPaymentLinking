@@ -11,8 +11,8 @@ from .services.auth_service import MySkladAuthService, build_ms_auth_service
 
 
 async def get_ms_auth_service(
+    request: Request,
     account_header_id: str | None = Header(default=None, alias="X-Account-Id"),
-    request: Request | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> MySkladAuthService:
     """Загрузить auth-контекст для конкретного аккаунта.
