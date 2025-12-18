@@ -83,9 +83,11 @@ class WebhookService:
                         not_found_in_ms += 1
                 except Exception as exc:
                     logger.error(
-                        "Ошибка при удалении вебхука из МойСклад: webhook_id=%s, error=%s",
+                        "Ошибка при удалении вебхука из МойСклад: webhook_id=%s, error=%s, type=%s",
                         webhook.ms_webhook_id,
                         exc,
+                        type(exc).__name__,
+                        exc_info=True,
                     )
                     failed_to_delete_from_ms += 1
         

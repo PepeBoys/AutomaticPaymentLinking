@@ -446,9 +446,19 @@ class MoySkladClient:
             if exc.response.status_code == 404:
                 logger.warning("Вебхук не найден в МойСклад: %s", webhook_id)
                 return False
+            logger.error(
+                "HTTP ошибка при удалении вебхука: webhook_id=%s, status=%d, response=%s",
+                webhook_id,
+                exc.response.status_code,
+                exc.response.text[:500] if exc.response.text else "N/A",
+            )
             raise MoySkladAPIError(
                 "Ошибка HTTP при удалении вебхука",
-                details={"status_code": exc.response.status_code, "error": str(exc)},
+                details={
+                    "status_code": exc.response.status_code,
+                    "error": str(exc),
+                    "response_text": exc.response.text[:500] if exc.response.text else None,
+                },
             ) from exc
         except Exception as exc:
             raise MoySkladAPIError(

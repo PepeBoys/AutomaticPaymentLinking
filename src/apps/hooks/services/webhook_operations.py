@@ -142,6 +142,12 @@ class EnableWebhookOperation(WebhookOperation):
             return self._already_enabled_result(existing)
         
         if not url_matches:
+            logger.warning(
+                "URL вебхука отличается от ожидаемого. "
+                "Существующий: %s, требуемый: %s. Обновляем.",
+                existing.get("url"),
+                self._config.url,
+            )
             return await self._update_url_and_enable(existing)
         
         logger.info("Вебхук найден но выключен, включаем")

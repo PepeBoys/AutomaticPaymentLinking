@@ -81,7 +81,7 @@ class VendorApiService:
             access_token, base_url=base_url, account_id=account_id
         )
 
-        # 5.5) cleanup old webhooks ТОЛЬКО если это реальная переустановка
+        # 5) cleanup old webhooks ТОЛЬКО если это реальная переустановка (аккаунт был неактивен)
         if not was_active:
             cleanup_stats = await self._webhook_service.cleanup_account_webhooks(account_id)
             logger.info(
@@ -97,7 +97,11 @@ class VendorApiService:
             self._session.expire_all()
             logger.info("Изменения после очистки вебхуков зафиксированы")
         else:
-            logger.info("Пропуск очистки вебхуков (аккаунт уже активен)")
+            logger.info(
+                "Пропуск очистки вебхуков (аккаунт уже активен). "
+                "Существующие вебхуки будут проверены и переиспользованы. "
+                "Если URL изменился - он будет обновлён."
+            )
 
         # 6) enable required webhooks in MS
         logger.info("Создание вебхуков для account_id=%s", account_id)
@@ -126,28 +130,17 @@ class VendorApiService:
         claims = self._verify_jwt(jwt_token)
         await self._guard_replay(claims)
 
-        account = await self._accounts.get_by_account_id(account_id)
-        if account and account.is_active and account.access_token:
-            self._auth_service.set_access_token(
-                account.access_token,
-                base_url=account.base_url or self._auth_service.get_base_url(),
-                account_id=account.account_id,
-            )
-            
-            cleanup_stats = await self._webhook_service.cleanup_account_webhooks(account_id)
-            logger.info(
-                "Очистка вебхуков при деактивации account_id=%s: "
-                "deleted_from_ms=%d, not_found_in_ms=%d, failed_to_delete_from_ms=%d, deleted_from_db=%d",
-                account_id,
-                cleanup_stats["deleted_from_ms"],
-                cleanup_stats["not_found_in_ms"],
-                cleanup_stats["failed_to_delete_from_ms"],
-                cleanup_stats["deleted_from_db"],
-            )
-
-            await self._session.commit()
-            logger.info("Изменения после очистки вебхуков при деактивации зафиксированы")
- 
+        logger.info(
+            "Деактивация: очистка только БД (токен отозван МС до вызова DELETE). "
+            "Вебхуки останутся в МС и будут переиспользованы при следующей активации."
+        )
+        
+        deleted_count = await self._uow.webhooks.delete_all_by_account_id(account_id)
+        logger.info(
+            "Удалено записей из БД при деактивации: %d для account_id=%s",
+            deleted_count,
+            account_id,
+        )
 
         await self._accounts.deactivate_account(account_id)
         self._auth_service.clear_access_token()
