@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.hooks.schemas import PaymentType
 from src.apps.hooks.services.webhook_service import WebhookService
+from src.apps.hooks.uow.unit_of_work import UnitOfWork
 from src.apps.ms_auth.services.auth_service import MySkladAuthService
 from src.core.config import settings
 
@@ -29,10 +30,16 @@ class VendorApiService:
         self._webhook_service = webhook_service
         self._accounts = VendorAccountRepository(session)
         self._jtis = VendorJtiRepository(session)
+        self._uow = UnitOfWork(session)
 
     async def activate_app(
         self, app_id: str, account_id: str, payload: ActivationPayload, jwt_token: str
     ) -> ActivationResponse:
+        logger.info(
+            "=== НАЧАЛО АКТИВАЦИИ === account_id=%s, jti=%s",
+            account_id,
+            jwt_token[-20:] if jwt_token else "N/A",
+        )
         # 1) validate request meta
         self._validate_app_id(app_id)
         self._validate_app_uid(payload.appUid)
@@ -41,8 +48,25 @@ class VendorApiService:
         claims = self._verify_jwt(jwt_token)
         await self._guard_replay(claims)
 
+        logger.info(
+            "JWT проверен, jti=%s сохранён в БД (защита от повторов)",
+            claims.get("jti"),
+        )
+
         # 3) get remap token (issued by MS) + base_url
         access_token, base_url = self._extract_access_token_and_base_url(payload)
+
+        # Проверяем был ли аккаунт активен ДО обновления
+        existing_account = await self._accounts.get_by_account_id(account_id)
+        was_active = existing_account and existing_account.is_active
+        
+        if was_active:
+            logger.info(
+                "Аккаунт уже был активен (повторный запрос активации от МС). Пропускаем очистку вебхуков."
+            )
+        else:
+            logger.info("Аккаунт неактивен или новый. Будет выполнена очистка вебхуков.")
+
 
         # 4) persist account linkage
         await self._accounts.upsert_account(
@@ -57,12 +81,39 @@ class VendorApiService:
             access_token, base_url=base_url, account_id=account_id
         )
 
+        # 5.5) cleanup old webhooks ТОЛЬКО если это реальная переустановка
+        if not was_active:
+            cleanup_stats = await self._webhook_service.cleanup_account_webhooks(account_id)
+            logger.info(
+                "Очистка вебхуков перед активацией account_id=%s: "
+                "deleted_from_ms=%d, not_found_in_ms=%d, failed_to_delete_from_ms=%d, deleted_from_db=%d",
+                account_id,
+                cleanup_stats["deleted_from_ms"],
+                cleanup_stats["not_found_in_ms"],
+                cleanup_stats["failed_to_delete_from_ms"],
+                cleanup_stats["deleted_from_db"],
+            )
+            await self._session.commit()
+            self._session.expire_all()
+            logger.info("Изменения после очистки вебхуков зафиксированы")
+        else:
+            logger.info("Пропуск очистки вебхуков (аккаунт уже активен)")
+
         # 6) enable required webhooks in MS
-        await self._enable_required_webhooks()
+        logger.info("Создание вебхуков для account_id=%s", account_id)
+        for payment_type in self._default_payment_types():
+            result = await self._webhook_service.toggle_webhook(
+                payment_type=payment_type, 
+                enabled=True,
+                # skip_existing_db_check=True,
+            )
+            logger.info("Webhook %s: operation=%s, success=%s", payment_type.value, result.operation, result.success)
+        
 
         await self._session.commit()
 
         logger.info(
+            "=== КОНЕЦ АКТИВАЦИИ === "
             "Vendor app activated: account_id=%s, app_uid=%s, jti=%s",
             account_id,
             payload.appUid,
@@ -75,6 +126,29 @@ class VendorApiService:
         claims = self._verify_jwt(jwt_token)
         await self._guard_replay(claims)
 
+        account = await self._accounts.get_by_account_id(account_id)
+        if account and account.is_active and account.access_token:
+            self._auth_service.set_access_token(
+                account.access_token,
+                base_url=account.base_url or self._auth_service.get_base_url(),
+                account_id=account.account_id,
+            )
+            
+            cleanup_stats = await self._webhook_service.cleanup_account_webhooks(account_id)
+            logger.info(
+                "Очистка вебхуков при деактивации account_id=%s: "
+                "deleted_from_ms=%d, not_found_in_ms=%d, failed_to_delete_from_ms=%d, deleted_from_db=%d",
+                account_id,
+                cleanup_stats["deleted_from_ms"],
+                cleanup_stats["not_found_in_ms"],
+                cleanup_stats["failed_to_delete_from_ms"],
+                cleanup_stats["deleted_from_db"],
+            )
+
+            await self._session.commit()
+            logger.info("Изменения после очистки вебхуков при деактивации зафиксированы")
+ 
+
         await self._accounts.deactivate_account(account_id)
         self._auth_service.clear_access_token()
         await self._session.commit()
@@ -82,10 +156,6 @@ class VendorApiService:
         logger.info(
             "Vendor app deactivated: account_id=%s, jti=%s", account_id, claims.get("jti")
         )
-
-    async def _enable_required_webhooks(self) -> None:
-        for payment_type in self._default_payment_types():
-            await self._webhook_service.toggle_webhook(payment_type=payment_type, enabled=True)
 
     @staticmethod
     def _default_payment_types() -> Iterable[PaymentType]:

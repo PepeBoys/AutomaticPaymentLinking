@@ -48,7 +48,15 @@ class WebhookOperation(ABC):
             "Пробуем найти вебхук по сохраненному ID из БД: %s", webhook_id
         )
 
-        webhook = await self._client.get_webhook_by_id(webhook_id)
+        try:
+            webhook = await self._client.get_webhook_by_id(webhook_id)
+        except Exception as exc:
+            logger.warning(
+                "Не удалось получить вебхук по сохраненному ID %s: %s. Продолжаем поиск.",
+                webhook_id,
+                str(exc),
+            )
+            return None
 
         if not webhook:
             return None

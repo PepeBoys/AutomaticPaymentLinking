@@ -57,6 +57,50 @@ class WebhookService:
 
         return account_id
     
+    async def cleanup_account_webhooks(self, account_id: str) -> dict[str, int]:
+        """
+        Удалить все вебхуки аккаунта из МойСклад и БД.
+        
+        Args:
+            account_id: ID аккаунта
+            
+        Returns:
+            Словарь со статистикой удаления
+        """
+        webhooks = await self._uow.webhooks.get_all(account_id)
+        
+        deleted_from_ms = 0
+        failed_to_delete_from_ms = 0
+        not_found_in_ms = 0
+        
+        for webhook in webhooks:
+            if webhook.ms_webhook_id:
+                try:
+                    success = await self._client.delete_webhook(webhook.ms_webhook_id)
+                    if success:
+                        deleted_from_ms += 1
+                    else:
+                        not_found_in_ms += 1
+                except Exception as exc:
+                    logger.error(
+                        "Ошибка при удалении вебхука из МойСклад: webhook_id=%s, error=%s",
+                        webhook.ms_webhook_id,
+                        exc,
+                    )
+                    failed_to_delete_from_ms += 1
+        
+        deleted_from_db = await self._uow.webhooks.delete_all_by_account_id(account_id)
+        await self._uow.commit()
+        logger.info("Удалено из БД: %d записей для account_id=%s", deleted_from_db, account_id)
+         
+        
+        return {
+            "deleted_from_ms": deleted_from_ms,
+            "not_found_in_ms": not_found_in_ms,
+            "failed_to_delete_from_ms": failed_to_delete_from_ms,
+            "deleted_from_db": deleted_from_db,
+        }
+    
     async def get_webhooks_status(self) -> Dict[str, WebhookStatusItem]:
         """
         Получить статус всех вебхуков с настройками.
@@ -215,6 +259,7 @@ class WebhookService:
         existing_db_entity = await self._uow.webhooks.get_by_payment_type(
             payment_type, account_id
         )
+        logger.info("existing_db_entity для %s: %s", payment_type.value, existing_db_entity)
         
         operation = WebhookOperationFactory.create_operation(
             enabled=enabled,
@@ -255,7 +300,14 @@ class WebhookService:
                 result.webhook_entity.check_document_organization = (
                     check_document_organization
                 )
-                saved_entity = await self._uow.webhooks.upsert(result.webhook_entity)
+                try:
+                    saved_entity = await self._uow.webhooks.upsert(result.webhook_entity)
+                except Exception as exc:
+                    logger.error(
+                        "Ошибка при upsert вебхука: account_id=%s, payment_type=%s, ms_webhook_id=%s, error=%s",
+                        account_id, payment_type.value, result.webhook_entity.ms_webhook_id, exc
+                    )
+                    raise
                 await self._uow.commit()
 
                 logger.info(

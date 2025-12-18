@@ -180,11 +180,11 @@ class MoySkladClient:
                 details={"error": str(exc)},
             ) from exc
     
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        reraise=True,
-    )
+    # @retry(
+    #     stop=stop_after_attempt(3),
+    #     wait=wait_exponential(multiplier=1, min=2, max=10),
+    #     reraise=True,
+    # )
     async def create_webhook(
         self,
         entity_type: str,
@@ -237,23 +237,23 @@ class MoySkladClient:
                 except Exception:
                     logger.error("Не удалось распарсить тело ответа 412")
                 
-                existing = await self.find_webhook_relaxed(entity_type, action)
-                if existing:
-                    logger.info(
-                        "Найден существующий вебхук (relaxed search): id=%s, url=%s, enabled=%s",
-                        existing.get("id"),
-                        existing.get("url"),
-                        existing.get("enabled"),
-                    )
+                # existing = await self.find_webhook_relaxed(entity_type, action)
+                # if existing:
+                #     logger.info(
+                #         "Найден существующий вебхук (relaxed search): id=%s, url=%s, enabled=%s",
+                #         existing.get("id"),
+                #         existing.get("url"),
+                #         existing.get("enabled"),
+                #     )
                     
-                    if existing.get("url") != url:
-                        logger.warning(
-                            "URL вебхука отличается! Ожидали: %s, получили: %s",
-                            url,
-                            existing.get("url"),
-                        )
+                #     if existing.get("url") != url:
+                #         logger.warning(
+                #             "URL вебхука отличается! Ожидали: %s, получили: %s",
+                #             url,
+                #             existing.get("url"),
+                #         )
                     
-                    return existing
+                    # return existing
                 
             raise MoySkladAPIError(
                 "Ошибка HTTP при создании вебхука",
@@ -415,3 +415,43 @@ class MoySkladClient:
         
         logger.warning("Вебхук не найден (relaxed match)")
         return None
+    
+    async def delete_webhook(self, webhook_id: str) -> bool:
+        """
+        Удалить вебхук из МойСклад.
+        
+        Args:
+            webhook_id: ID вебхука
+            
+        Returns:
+            True если успешно удален, False если не найден
+            
+        Raises:
+            MoySkladAPIError: При ошибке запроса
+        """
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+            
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/webhook/{webhook_id}"
+                logger.info("Удаление вебхука из МойСклад: %s", webhook_id)
+                
+                resp = await client.delete(url)
+                resp.raise_for_status()
+                
+                logger.info("Вебхук успешно удален из МойСклад: %s", webhook_id)
+                return True
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.warning("Вебхук не найден в МойСклад: %s", webhook_id)
+                return False
+            raise MoySkladAPIError(
+                "Ошибка HTTP при удалении вебхука",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:
+            raise MoySkladAPIError(
+                "Ошибка при удалении вебхука",
+                details={"error": str(exc)},
+            ) from exc

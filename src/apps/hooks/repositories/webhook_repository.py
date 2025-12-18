@@ -1,8 +1,10 @@
 """Репозиторий для работы с вебхуками."""
 
+import logging
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..domain.entities import WebhookEntity
@@ -10,6 +12,8 @@ from ..exceptions import RepositoryError
 from ..models import WebhookSubscription
 from ..schemas import DocumentPriority, DocumentType, LinkType, PaymentType
 from .base import AbstractRepository
+
+logger = logging.getLogger(__name__)
 
 
 class WebhookRepository(AbstractRepository[WebhookEntity]):
@@ -297,6 +301,35 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             await self._session.flush()
             await self._session.refresh(model)
             return self._to_entity(model)
+        
+        except IntegrityError as exc:
+            logger.warning(
+                "IntegrityError при добавлении вебхука (возможно дубликат). "
+                "Пытаемся найти существующий: payment_type=%s, account_id=%s, ms_webhook_id=%s",
+                entity.payment_type.value if entity.payment_type else None,
+                entity.ms_account_id,
+                entity.ms_webhook_id,
+            )
+            
+            await self._session.rollback()
+            
+            existing = await self.get_by_payment_type(
+                entity.payment_type, entity.ms_account_id
+            )
+            
+            if existing:
+                logger.info(
+                    "Найден существующий вебхук после IntegrityError: id=%s, ms_webhook_id=%s",
+                    existing.id,
+                    existing.ms_webhook_id,
+                )
+                entity.id = existing.id
+                return await self.update(entity)
+            
+            raise RepositoryError(
+                "IntegrityError при добавлении вебхука, существующий не найден",
+                details={"error": str(exc)},
+            ) from exc
         except RepositoryError:
             raise
         except Exception as exc:
@@ -383,9 +416,17 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                 details={"entity": str(entity)},
             )
 
-        existing = await self.get_by_ms_webhook_id(
-            entity.ms_webhook_id, entity.ms_account_id
-        )
+        existing = None
+        
+        if entity.ms_webhook_id:
+            existing = await self.get_by_ms_webhook_id(
+                entity.ms_webhook_id, entity.ms_account_id
+            )
+        
+        if not existing:
+            existing = await self.get_by_payment_type(
+                entity.payment_type, entity.ms_account_id
+            )
         
         if existing:
             entity.id = existing.id
@@ -419,6 +460,39 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             raise RepositoryError(
                 "Ошибка при удалении вебхука",
                 details={"error": str(exc)},
+            ) from exc
+
+    async def delete_all_by_account_id(self, account_id: str) -> int:
+        """
+        Удалить все вебхуки для аккаунта.
+        
+        Args:
+            account_id: ID аккаунта
+            
+        Returns:
+            Количество удаленных записей
+            
+        Raises:
+            RepositoryError: При ошибке удаления
+        """
+        try:
+            stmt = select(WebhookSubscription).where(
+                WebhookSubscription.ms_account_id == account_id
+            )
+            result = await self._session.execute(stmt)
+            models = result.scalars().all()
+            count = len(models)
+
+            for model in models:
+                await self._session.delete(model)
+            
+            await self._session.flush()
+
+            return count
+        except Exception as exc:
+            raise RepositoryError(
+                "Ошибка при удалении вебхуков аккаунта",
+                details={"account_id": account_id, "error": str(exc)},
             ) from exc
     
     @staticmethod

@@ -26,6 +26,7 @@ class UnitOfWork:
         """
         self._session = session
         self._webhooks: Optional[WebhookRepository] = None
+        self._committed = False
     
     @property
     def webhooks(self) -> WebhookRepository:
@@ -41,6 +42,7 @@ class UnitOfWork:
     
     async def commit(self) -> None:
         """Зафиксировать изменения в БД."""
+        self._committed = True
         await self._session.commit()
     
     async def rollback(self) -> None:
