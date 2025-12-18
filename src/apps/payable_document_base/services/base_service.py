@@ -62,7 +62,11 @@ class BaseDocumentService(Generic[TEntity, TClient], ABC):
             )
 
         entities = [self._to_entity(data) for data in documents_data]
-        entities = [entity for entity in entities if not entity.is_fully_paid()]
+
+        if search_by_sum:
+            entities = [entity for entity in entities if entity.payed_sum == 0]
+        else:
+            entities = [entity for entity in entities if not entity.is_fully_paid()]
 
         logger.info(
             "Найдено документов для привязки: %d (agent=%s, sum=%s, by_sum=%s)",
