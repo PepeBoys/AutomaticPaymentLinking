@@ -77,6 +77,21 @@ class WebhookHandler:
                 payment.agent_id,
             )
 
+            if payment.linked_operations:
+                logger.info(
+                    "%s %s уже содержит привязки (%d). Пропускаем обработку.",
+                    payment_label.capitalize(),
+                    payment.id,
+                    len(payment.linked_operations),
+                )
+                return {
+                    "success": False,
+                    "message": (
+                        f"{payment_label.capitalize()} уже привязан к документу, обработка пропущена"
+                    ),
+                    "payment_id": payment.id,
+                }
+
             linked_documents = []
             if subscription.link_type == LinkType.counterparty:
                 document, linked_sum, linked_documents = await self._link_payment_by_counterparty(
