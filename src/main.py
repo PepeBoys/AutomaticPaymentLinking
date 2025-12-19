@@ -1,11 +1,13 @@
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.cors import CORSMiddleware
 
 from src.apps.cashin.api import router as cashin_router
 from src.apps.cashin.exception_handlers import (
@@ -26,6 +28,7 @@ from src.apps.paymentin.exception_handlers import (
 )
 from src.apps.vendor_api.api import router as vendor_api_router
 from src.core.database import init_db
+from src.core.config import settings
 from src.core.logging_config import setup_logging
 
 Path("logs").mkdir(exist_ok=True)
@@ -43,6 +46,35 @@ app = FastAPI(
     title="МС: Автоматическая привязка платежей",
     lifespan=lifespan,
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+if settings.api_rate_limit > 0:
+    rate_limit_window = 60
+    rate_limit_counters: dict[str, tuple[float, int]] = {}
+
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        client_host = request.client.host if request.client else "unknown"
+        now = time.time()
+        window_start, count = rate_limit_counters.get(client_host, (now, 0))
+
+        if now - window_start >= rate_limit_window:
+            window_start, count = now, 0
+
+        count += 1
+        rate_limit_counters[client_host] = (window_start, count)
+
+        if count > settings.api_rate_limit:
+            return PlainTextResponse("Rate limit exceeded", status_code=429)
+
+        return await call_next(request)
 
 for exc_class, handler in HOOKS_EXCEPTION_HANDLERS.items():
     app.add_exception_handler(exc_class, handler)

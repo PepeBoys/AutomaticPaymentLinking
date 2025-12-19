@@ -8,8 +8,10 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ...ms_auth.services.auth_service import MySkladAuthService
 from ..exceptions import MoySkladAPIError
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
+RETRY_ATTEMPTS = settings.webhook_retry_attempts
 
 
 class MoySkladClient:
@@ -27,7 +29,7 @@ class MoySkladClient:
             auth_service: Сервис аутентификации
         """
         self._auth_service = auth_service
-        self._timeout = 30.0
+        self._timeout = settings.webhook_timeout
     
     def _get_base_url(self) -> str:
         """
@@ -65,7 +67,7 @@ class MoySkladClient:
         }
     
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(RETRY_ATTEMPTS),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
@@ -266,7 +268,7 @@ class MoySkladClient:
             ) from exc
     
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(RETRY_ATTEMPTS),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
