@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: automaticpaymentlinking_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      APL_HOST: ${APL_HOST:-0.0.0.0}
+      APL_PORT: ${APL_PORT:-8000}
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./logs:/app/logs
