@@ -495,6 +495,7 @@
                             updateTabControlsState(paymentType, webhookData.enabled);
                         }
 
+
                         checkbox.disabled = false;
                     });
                 })
@@ -620,6 +621,10 @@
         }
 
         initializeStatusSelects();
+
+        ['incoming_payment', 'incoming_order', 'outgoing_payment', 'outgoing_order'].forEach((paymentType) => {
+            updateTabControlsState(paymentType, false);
+        });
 
         checkboxes.forEach((checkbox) => {
             checkbox.addEventListener("change", function () {

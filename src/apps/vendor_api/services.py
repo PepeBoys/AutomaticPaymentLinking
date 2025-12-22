@@ -103,15 +103,11 @@ class VendorApiService:
                 "Если URL изменился - он будет обновлён."
             )
 
-        # 6) enable required webhooks in MS
-        logger.info("Создание вебхуков для account_id=%s", account_id)
-        for payment_type in self._default_payment_types():
-            result = await self._webhook_service.toggle_webhook(
-                payment_type=payment_type, 
-                enabled=True,
-                # skip_existing_db_check=True,
-            )
-            logger.info("Webhook %s: operation=%s, success=%s", payment_type.value, result.operation, result.success)
+        # 6) do not auto-enable webhooks on activation
+        logger.info(
+            "Автовключение вебхуков при активации отключено. "
+            "Пользователь сам включает нужные привязки через интерфейс."
+        )
         
 
         await self._session.commit()
