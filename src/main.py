@@ -27,8 +27,9 @@ from src.apps.paymentin.exception_handlers import (
     EXCEPTION_HANDLERS as PAYMENTIN_EXCEPTION_HANDLERS,
 )
 from src.apps.vendor_api.api import router as vendor_api_router
-from src.core.database import init_db
+from src.apps.vendor_api.middleware import AppUidAccountMiddleware
 from src.core.config import settings
+from src.core.database import init_db
 from src.core.logging_config import setup_logging
 
 Path("logs").mkdir(exist_ok=True)
@@ -54,6 +55,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AppUidAccountMiddleware)
 
 if settings.api_rate_limit > 0:
     rate_limit_window = 60
