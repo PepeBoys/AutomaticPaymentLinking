@@ -56,6 +56,9 @@ db_manager = DatabaseManager(
     echo=False,
 )
 
+# Backward-compatible alias for code expecting async_session_maker.
+async_session_maker = db_manager.session_factory
+
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Dependency для FastAPI."""

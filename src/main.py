@@ -100,6 +100,7 @@ async def index(request: Request):
     context = {
         "request": request,
         "page_title": "Автоматическая привязка платежей",
+        "account_id": getattr(request.state, "ms_account_id", None),
     }
     return templates.TemplateResponse("index.html", context)
 
