@@ -129,10 +129,39 @@
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const checkboxes = document.querySelectorAll(".js-auto-link-toggle");
+        const urlParams = new URLSearchParams(window.location.search);
+        const appUid = urlParams.get("appUid");
+        const accountId = "{{ account_id | default('') }}";
 
         const processingFlags = {};
         const webhookStatusCache = {};
         let saveTimeouts = {};
+
+        function buildHeaders(additionalHeaders = {}) {
+            const headers = { ...additionalHeaders };
+
+            if (accountId) {
+                headers["X-Account-Id"] = accountId;
+            }
+
+            return headers;
+        }
+
+        function buildApiUrl(path, params = {}) {
+            const url = new URL(path, window.location.origin);
+
+            if (appUid) {
+                url.searchParams.set("appUid", appUid);
+            }
+
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== "") {
+                    url.searchParams.set(key, value);
+                }
+            });
+
+            return url.toString();
+        }
 
         function createSelectElement(className, paymentType) {
             const select = document.createElement('select');
@@ -422,7 +451,13 @@
             const paymentHint = tab.querySelector('.js-payment-status-hint');
             const documentHint = tab.querySelector('.js-document-status-hint');
 
-            fetch(`/api/hooks/statuses?payment_type=${paymentType}&document_type=${documentType}`)
+            fetch(
+                buildApiUrl("/api/hooks/statuses", {
+                    payment_type: paymentType,
+                    document_type: documentType,
+                }),
+                { headers: buildHeaders() }
+            )
                 .then(response => response.json())
                 .then(data => {
                     const cached = webhookStatusCache[paymentType] || {};
@@ -465,7 +500,7 @@
         }
 
         function loadWebhookStatus() {
-            fetch("/api/hooks/webhooks/status")
+            fetch(buildApiUrl("/api/hooks/webhooks/status"), { headers: buildHeaders() })
                 .then(response => response.json())
                 .then(data => {
                     checkboxes.forEach((checkbox) => {
@@ -519,11 +554,11 @@
             
             showSavingIndicator(paymentType);
 
-            fetch("/api/hooks/update-link-settings", {
+            fetch(buildApiUrl("/api/hooks/update-link-settings"), {
                 method: "POST",
-                headers: {
+                headers: buildHeaders({
                     "Content-Type": "application/json"
-                },
+                }),
                 body: JSON.stringify({
                     payment_type: paymentType,
                     document_type: settings.document_type,
@@ -574,11 +609,11 @@
             
             showSavingIndicator(paymentType);
 
-            fetch("/api/hooks/auto-link-toggle", {
+            fetch(buildApiUrl("/api/hooks/auto-link-toggle"), {
                 method: "POST",
-                headers: {
+                headers: buildHeaders({
                     "Content-Type": "application/json"
-                },
+                }),
                 body: JSON.stringify({
                     payment_type: paymentType,
                     enabled: enabled,
