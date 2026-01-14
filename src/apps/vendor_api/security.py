@@ -89,3 +89,11 @@ def sign_vendor_jwt(
     payload_b64 = _b64url_encode(json.dumps(payload, separators=",:").encode())
     signature = _sign(header_b64, payload_b64, secret)
     return f"{header_b64}.{payload_b64}.{signature}"
+
+
+def create_vendor_jwt(expires_in: int = 300) -> str:
+    """Создать JWT токен для запросов к Vendor API МойСклад."""
+    return sign_vendor_jwt(
+        claims={"iss": settings.ms_app_uid},
+        expires_in=expires_in,
+    )
