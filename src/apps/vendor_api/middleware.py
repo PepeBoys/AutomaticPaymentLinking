@@ -1,6 +1,7 @@
 import logging
 from typing import Callable
 
+import httpx
 from fastapi import Request, Response
 from sqlalchemy import select
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -24,6 +25,12 @@ class AppUidAccountMiddleware(BaseHTTPMiddleware):
     COOKIE_MAX_AGE = 86400  # 24 часа
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Для отладки и проверки теории фикса бага.
+        logger.info(
+            "=== INCOMING REQUEST === path=%s, query_params=%s",
+            request.url.path,
+            dict(request.query_params),
+        )
         # Если account_id уже установлен (например, из вебхука) - пропускаем
         if hasattr(request.state, "ms_account_id") and request.state.ms_account_id:
             return await call_next(request)
