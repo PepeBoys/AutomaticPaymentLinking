@@ -93,7 +93,7 @@ class AppUidAccountMiddleware(BaseHTTPMiddleware):
         """
         Получить accountId через Vendor API по contextKey.
 
-        GET /context/{contextKey} -> {"accountId": "...", "userId": "...", ...}
+        POST /context/{contextKey} -> {"accountId": "...", "userId": "...", ...}
         """
         try:
             jwt_token = create_vendor_jwt()
@@ -101,7 +101,7 @@ class AppUidAccountMiddleware(BaseHTTPMiddleware):
             url = f"{self.VENDOR_API_BASE}/context/{context_key}"
 
             async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(url, headers=headers)
+                response = await client.post(url, headers=headers)
                 response.raise_for_status()
                 data = response.json()
                 account_id = data.get("accountId")
