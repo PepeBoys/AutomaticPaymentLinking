@@ -144,9 +144,8 @@ class AppUidAccountMiddleware(BaseHTTPMiddleware):
                     .where(VendorAccount.account_id == account_id)
                     .where(VendorAccount.is_active.is_(True))
                 )
-                result = await session.execute(stmt)
-                account = result.scalar_one_or_none()
-                return result.scalar_one_or_none() is not None
+                result = await session.scalar(stmt)
+                return result is not None
         except Exception as e:
             logger.error(
                 "Ошибка при проверке account_id=%s: %s",
