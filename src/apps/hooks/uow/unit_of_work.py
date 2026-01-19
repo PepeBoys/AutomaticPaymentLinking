@@ -4,7 +4,11 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..repositories.webhook_processing_lock_repository import (
+    WebhookProcessingLockRepository,
+)
 from ..repositories.webhook_repository import WebhookRepository
+from ..repositories.webhook_request_repository import WebhookRequestRepository
 
 
 class UnitOfWork:
@@ -26,6 +30,8 @@ class UnitOfWork:
         """
         self._session = session
         self._webhooks: Optional[WebhookRepository] = None
+        self._webhook_processing_locks: Optional[WebhookProcessingLockRepository] = None
+        self._webhook_requests: Optional[WebhookRequestRepository] = None
         self._committed = False
     
     @property
@@ -39,6 +45,20 @@ class UnitOfWork:
         if self._webhooks is None:
             self._webhooks = WebhookRepository(self._session)
         return self._webhooks
+
+    @property
+    def webhook_requests(self) -> WebhookRequestRepository:
+        if self._webhook_requests is None:
+            self._webhook_requests = WebhookRequestRepository(self._session)
+        return self._webhook_requests
+
+    @property
+    def webhook_processing_locks(self) -> WebhookProcessingLockRepository:
+        if self._webhook_processing_locks is None:
+            self._webhook_processing_locks = WebhookProcessingLockRepository(
+                self._session
+            )
+        return self._webhook_processing_locks
     
     async def commit(self) -> None:
         """Зафиксировать изменения в БД."""
