@@ -4,6 +4,9 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..repositories.webhook_processing_lock_repository import (
+    WebhookProcessingLockRepository,
+)
 from ..repositories.webhook_repository import WebhookRepository
 from ..repositories.webhook_request_repository import WebhookRequestRepository
 

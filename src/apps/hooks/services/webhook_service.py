@@ -1,5 +1,6 @@
 """Основной сервис для работы с вебхуками."""
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict
