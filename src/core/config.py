@@ -19,9 +19,6 @@ class Settings(BaseSettings):
     webhook_timeout: float = 30.0
     webhook_retry_attempts: int = 3
     webhook_request_ttl_seconds: int = 3600
-    webhook_processing_lock_ttl_seconds: int = 300
-    webhook_processing_lock_timeout_seconds: int = 60
-    webhook_processing_lock_retry_delay_seconds: float = 0.25
 
     # Security
     allowed_origins: list[str] = ["http://localhost:3000", "https://your-domain.com"]

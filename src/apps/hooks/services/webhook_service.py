@@ -600,35 +600,3 @@ class WebhookService:
             raise
 
         return "accepted"
-
-    async def acquire_processing_lock(self, *, account_id: str) -> bool:
-        timeout = settings.webhook_processing_lock_timeout_seconds
-        retry_delay = settings.webhook_processing_lock_retry_delay_seconds
-        deadline = datetime.now(timezone.utc) + timedelta(seconds=timeout)
-
-        while True:
-            now = datetime.now(timezone.utc)
-            await self._uow.webhook_processing_locks.cleanup_expired(now)
-            expires_at = now + timedelta(
-                seconds=settings.webhook_processing_lock_ttl_seconds
-            )
-
-            acquired = await self._uow.webhook_processing_locks.acquire(
-                account_id=account_id,
-                expires_at=expires_at,
-            )
-
-            if acquired:
-                await self._uow.commit()
-                return True
-
-            await self._uow.rollback()
-
-            if now >= deadline:
-                return False
-
-            await asyncio.sleep(retry_delay)
-
-    async def release_processing_lock(self, *, account_id: str) -> None:
-        await self._uow.webhook_processing_locks.delete_by_account_id(account_id)
-        await self._uow.commit()
