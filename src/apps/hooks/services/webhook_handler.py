@@ -403,6 +403,26 @@ class WebhookHandler:
             if remaining_sum <= 0:
                 break
 
+        if remaining_sum > 0 and documents:
+            fallback_document = last_linked_document or documents[-1]
+            await payment_service.link_to_document(
+                payment_id=payment.id,
+                document_meta_href=fallback_document.meta_href,
+                linked_sum=remaining_sum,
+            )
+            logger.info(
+                "Остаток %s %s привязан к %s %s: linked_sum=%s",
+                payment_label,
+                payment.id,
+                document_type.value,
+                fallback_document.name,
+                remaining_sum,
+            )
+            if fallback_document not in linked_documents:
+                linked_documents.append(fallback_document)
+            last_linked_document = fallback_document
+            remaining_sum = 0
+
         total_linked = payment.sum - remaining_sum
         return last_linked_document, total_linked, linked_documents
 
