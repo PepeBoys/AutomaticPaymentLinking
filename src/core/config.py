@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     ms_webhook_url: str = ""
     webhook_timeout: float = 30.0
     webhook_retry_attempts: int = 3
+    webhook_request_ttl_seconds: int = 3600
 
     # Security
     allowed_origins: list[str] = ["http://localhost:3000", "https://your-domain.com"]
