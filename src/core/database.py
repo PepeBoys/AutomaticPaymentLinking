@@ -112,3 +112,26 @@ def _apply_manual_migrations(sync_conn) -> None:
                 "CREATE UNIQUE INDEX IF NOT EXISTS ix_webhook_account_payment "
                 "ON webhooksubscriptions (ms_account_id, payment_type)"
             )
+
+    if "webhookrequests" not in inspector.get_table_names():
+        sync_conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS webhookrequests ("
+            "id INTEGER PRIMARY KEY, "
+            "request_id VARCHAR(64) NOT NULL UNIQUE, "
+            "ms_account_id VARCHAR(64), "
+            "events_count INTEGER NOT NULL DEFAULT 0, "
+            "status VARCHAR(32) NOT NULL DEFAULT 'accepted', "
+            "expires_at DATETIME NOT NULL, "
+            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+            "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+            "is_active BOOLEAN NOT NULL DEFAULT 1"
+            ")"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_webhookrequests_request_id "
+            "ON webhookrequests (request_id)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_webhookrequests_expires_at "
+            "ON webhookrequests (expires_at)"
+        )
