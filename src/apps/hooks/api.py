@@ -85,29 +85,62 @@ async def _process_moysklad_webhook(
         )
 
         service = WebhookService(uow=UnitOfWork(session), auth_service=auth_service)
-        try:
-            await service.process_incoming_webhook(
-                request_id=request_id,
-                payload=payload,
-                paymentin_service=PaymentInService(auth_service),
-                cashin_service=CashInService(auth_service),
-                paymentout_service=PaymentOutService(auth_service),
-                cashout_service=CashOutService(auth_service),
-                customerorder_service=CustomerOrderService(auth_service),
-                invoiceout_service=InvoiceOutService(auth_service),
-                demand_service=DemandService(auth_service),
-                purchaseorder_service=PurchaseOrderService(auth_service),
-                invoicein_service=InvoiceInService(auth_service),
-                supply_service=SupplyService(auth_service),
-            )
-        except Exception as exc:
-            logger.error(
-                "Webhook background processing failed: requestId=%s, accountId=%s, error=%s",
+        await service.process_incoming_webhook(
+            request_id=request_id,
+            payload=payload,
+            paymentin_service=PaymentInService(auth_service),
+            cashin_service=CashInService(auth_service),
+            paymentout_service=PaymentOutService(auth_service),
+            cashout_service=CashOutService(auth_service),
+            customerorder_service=CustomerOrderService(auth_service),
+            invoiceout_service=InvoiceOutService(auth_service),
+            demand_service=DemandService(auth_service),
+            purchaseorder_service=PurchaseOrderService(auth_service),
+            invoicein_service=InvoiceInService(auth_service),
+            supply_service=SupplyService(auth_service),
+        )
+
+
+async def _process_moysklad_webhook(
+    *,
+    account_id: str,
+    payload: MySkladWebhookPayload,
+    request_id: str,
+) -> None:
+    async with async_session_maker() as session:
+        repo = VendorAccountRepository(session)
+        account = await repo.get_by_account_id(account_id)
+
+        if not account or not account.is_active or not account.access_token:
+            logger.warning(
+                "Webhook skipped: account inactive or missing token: requestId=%s, accountId=%s",
                 request_id,
                 account_id,
-                exc,
-                exc_info=True,
             )
+            return
+
+        auth_service = build_ms_auth_service()
+        auth_service.set_access_token(
+            account.access_token,
+            base_url=account.base_url or settings.ms_base_url,
+            account_id=account.account_id,
+        )
+
+        service = WebhookService(uow=UnitOfWork(session), auth_service=auth_service)
+        await service.process_incoming_webhook(
+            request_id=request_id,
+            payload=payload,
+            paymentin_service=PaymentInService(auth_service),
+            cashin_service=CashInService(auth_service),
+            paymentout_service=PaymentOutService(auth_service),
+            cashout_service=CashOutService(auth_service),
+            customerorder_service=CustomerOrderService(auth_service),
+            invoiceout_service=InvoiceOutService(auth_service),
+            demand_service=DemandService(auth_service),
+            purchaseorder_service=PurchaseOrderService(auth_service),
+            invoicein_service=InvoiceInService(auth_service),
+            supply_service=SupplyService(auth_service),
+        )
 
 
 @router.get("/webhooks/status", response_model=WebhookStatusResponse)
