@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, CheckConstraint, Column
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Integer
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import Index, String
 
@@ -111,5 +111,32 @@ class WebhookSubscription(Base):
         CheckConstraint(
             "ms_account_id IS NOT NULL AND ms_account_id != ''",
             name="ck_webhook_account_id_not_empty",
+        ),
+    )
+
+
+class WebhookRequest(Base):
+    request_id = Column(String(64), nullable=False, unique=True, index=True)
+    ms_account_id = Column(String(64), nullable=True, index=True)
+    events_count = Column(Integer, nullable=False, default=0)
+    status = Column(String(32), nullable=False, default="accepted")
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "request_id IS NOT NULL AND request_id != ''",
+            name="ck_webhook_request_id_not_empty",
+        ),
+    )
+
+
+class WebhookProcessingLock(Base):
+    account_id = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "account_id IS NOT NULL AND account_id != ''",
+            name="ck_webhook_processing_account_id_not_empty",
         ),
     )
