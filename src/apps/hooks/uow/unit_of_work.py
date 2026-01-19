@@ -30,6 +30,7 @@ class UnitOfWork:
         """
         self._session = session
         self._webhooks: Optional[WebhookRepository] = None
+        self._webhook_processing_locks: Optional[WebhookProcessingLockRepository] = None
         self._webhook_requests: Optional[WebhookRequestRepository] = None
         self._committed = False
     
@@ -50,6 +51,14 @@ class UnitOfWork:
         if self._webhook_requests is None:
             self._webhook_requests = WebhookRequestRepository(self._session)
         return self._webhook_requests
+
+    @property
+    def webhook_processing_locks(self) -> WebhookProcessingLockRepository:
+        if self._webhook_processing_locks is None:
+            self._webhook_processing_locks = WebhookProcessingLockRepository(
+                self._session
+            )
+        return self._webhook_processing_locks
     
     async def commit(self) -> None:
         """Зафиксировать изменения в БД."""

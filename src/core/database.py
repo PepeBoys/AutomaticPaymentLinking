@@ -69,6 +69,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Инициализация БД."""
     import src.apps.hooks.models
+    import src.apps.hooks.processing_lock_models
     import src.apps.vendor_api.models
 
     from .models import Base
@@ -134,4 +135,24 @@ def _apply_manual_migrations(sync_conn) -> None:
         sync_conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_webhookrequests_expires_at "
             "ON webhookrequests (expires_at)"
+        )
+
+    if "webhookprocessinglocks" not in inspector.get_table_names():
+        sync_conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS webhookprocessinglocks ("
+            "id INTEGER PRIMARY KEY, "
+            "account_id VARCHAR(64) NOT NULL UNIQUE, "
+            "expires_at DATETIME NOT NULL, "
+            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+            "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+            "is_active BOOLEAN NOT NULL DEFAULT 1"
+            ")"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_webhookprocessinglocks_account_id "
+            "ON webhookprocessinglocks (account_id)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_webhookprocessinglocks_expires_at "
+            "ON webhookprocessinglocks (expires_at)"
         )

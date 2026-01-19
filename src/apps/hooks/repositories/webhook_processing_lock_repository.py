@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import WebhookProcessingLock
+from ..processing_lock_models import WebhookProcessingLock
 
 
 class WebhookProcessingLockRepository:
