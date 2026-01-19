@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PaymentType(str, Enum):
@@ -108,15 +108,15 @@ class MetaRef(BaseModel):
 
 
 class AuditContext(BaseModel):
-    meta: MetaRef
-    moment: datetime
-    uid: str
+    meta: Optional[MetaRef] = None
+    moment: Optional[datetime] = None
+    uid: Optional[str] = None
 
 
 class WebhookEvent(BaseModel):
-    meta: MetaRef
-    action: str  # CREATE / UPDATE / DELETE / PROCESSED
-    accountId: str
+    meta: Optional[MetaRef] = None
+    action: Optional[str] = None  # CREATE / UPDATE / DELETE / PROCESSED
+    accountId: Optional[str] = None
     updatedFields: Optional[List[str]] = None
 
 
@@ -128,5 +128,5 @@ class MySkladWebhookPayload(BaseModel):
       "events": [ {...}, {...} ]
     }
     """
-    auditContext: AuditContext
-    events: List[WebhookEvent]
+    auditContext: Optional[AuditContext] = None
+    events: List[WebhookEvent] = Field(default_factory=list)

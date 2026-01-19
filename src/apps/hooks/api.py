@@ -1,6 +1,7 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..cashin.dependencies import CashInSvcDep
 from ..cashout.dependencies import CashOutSvcDep
@@ -9,13 +10,26 @@ from ..demand.dependencies import DemandSvcDep
 from ..invoicein.dependencies import InvoiceInSvcDep
 from ..invoiceout.dependencies import InvoiceOutSvcDep
 from ..paymentin.dependencies import PaymentInSvcDep
+from ..paymentin.services.paymentin_service import PaymentInService
 from ..paymentout.dependencies import PaymentOutSvcDep
+from ..paymentout.services.paymentout_service import PaymentOutService
 from ..purchaseorder.dependencies import PurchaseOrderSvcDep
+from ..purchaseorder.services.purchaseorder_service import PurchaseOrderService
 from ..supply.dependencies import SupplySvcDep
+from ..supply.services.supply_service import SupplyService
+from src.apps.cashin.services.cashin_service import CashInService
+from src.apps.cashout.services.cashout_service import CashOutService
+from src.apps.customerorder.services.customerorder_service import CustomerOrderService
+from src.apps.demand.services.demand_service import DemandService
+from src.apps.invoicein.services.invoicein_service import InvoiceInService
+from src.apps.invoiceout.services.invoiceout_service import InvoiceOutService
+from src.apps.ms_auth.services.auth_service import build_ms_auth_service
+from src.apps.vendor_api.repository import VendorAccountRepository
+from src.core.config import settings
+from src.core.database import async_session_maker, get_session
 from .dependencies import (
     RequestIdQuery,
     WebhookSvcDep,
-    set_request_account_from_webhook,
 )
 from .schemas import (
     AutoLinkTogglePayload,
@@ -26,10 +40,54 @@ from .schemas import (
     UpdateLinkSettingsPayload,
     WebhookStatusResponse,
 )
+from .services.webhook_service import WebhookService
+from .uow.unit_of_work import UnitOfWork
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _process_moysklad_webhook(
+    *,
+    account_id: str,
+    payload: MySkladWebhookPayload,
+    request_id: str,
+) -> None:
+    async with async_session_maker() as session:
+        repo = VendorAccountRepository(session)
+        account = await repo.get_by_account_id(account_id)
+
+        if not account or not account.is_active or not account.access_token:
+            logger.warning(
+                "Webhook skipped: account inactive or missing token: requestId=%s, accountId=%s",
+                request_id,
+                account_id,
+            )
+            return
+
+        auth_service = build_ms_auth_service()
+        auth_service.set_access_token(
+            account.access_token,
+            base_url=account.base_url or settings.ms_base_url,
+            account_id=account.account_id,
+        )
+
+        service = WebhookService(uow=UnitOfWork(session), auth_service=auth_service)
+        await service.process_incoming_webhook(
+            request_id=request_id,
+            payload=payload,
+            paymentin_service=PaymentInService(auth_service),
+            cashin_service=CashInService(auth_service),
+            paymentout_service=PaymentOutService(auth_service),
+            cashout_service=CashOutService(auth_service),
+            customerorder_service=CustomerOrderService(auth_service),
+            invoiceout_service=InvoiceOutService(auth_service),
+            demand_service=DemandService(auth_service),
+            purchaseorder_service=PurchaseOrderService(auth_service),
+            invoicein_service=InvoiceInService(auth_service),
+            supply_service=SupplyService(auth_service),
+        )
 
 
 @router.get("/webhooks/status", response_model=WebhookStatusResponse)
@@ -201,41 +259,66 @@ async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDe
 @router.post("/moysklad/webhook", status_code=204)
 async def receive_moysklad_webhook(
     payload: MySkladWebhookPayload,
-    service: WebhookSvcDep,
-    paymentin_service: PaymentInSvcDep,
-    cashin_service: CashInSvcDep,
-    paymentout_service: PaymentOutSvcDep,
-    cashout_service: CashOutSvcDep,
-    customerorder_service: CustomerOrderSvcDep,
-    invoiceout_service: InvoiceOutSvcDep,
-    demand_service: DemandSvcDep,
-    purchaseorder_service: PurchaseOrderSvcDep,
-    invoicein_service: InvoiceInSvcDep,
-    supply_service: SupplySvcDep,
     request_id: RequestIdQuery = None,
-    _: None = Depends(set_request_account_from_webhook),
+    background_tasks: BackgroundTasks = None,
+    session: AsyncSession = Depends(get_session),
 ) -> Response:
-    logger.info(
-        "Получен вебхук МойСклад: requestId=%s, events=%d, uid=%s, moment=%s",
-        request_id,
-        len(payload.events),
-        payload.auditContext.uid,
-        payload.auditContext.moment,
+    events = payload.events or []
+    events_count = len(events)
+    account_ids = {
+        event.accountId for event in events if event and event.accountId is not None
+    }
+    has_missing_fields = any(
+        event.accountId is None or event.meta is None or event.action is None
+        for event in events
     )
 
-    await service.process_incoming_webhook(
+    if (
+        not request_id
+        or events_count == 0
+        or len(account_ids) != 1
+        or has_missing_fields
+    ):
+        account_id = next(iter(account_ids), None)
+        logger.warning(
+            "Webhook invalid_payload: requestId=%s, accountId=%s, events=%d",
+            request_id,
+            account_id,
+            events_count,
+        )
+        return Response(status_code=204)
+
+    account_id = next(iter(account_ids))
+
+    service = WebhookService(
+        uow=UnitOfWork(session),
+        auth_service=build_ms_auth_service(),
+    )
+    result = await service.register_webhook_request(
         request_id=request_id,
+        account_id=account_id,
+        events_count=events_count,
+    )
+
+    logger.info(
+        "Webhook %s: requestId=%s, accountId=%s, events=%d",
+        result,
+        request_id,
+        account_id,
+        events_count,
+    )
+
+    if result == "duplicate":
+        return Response(status_code=204)
+
+    if background_tasks is None:
+        background_tasks = BackgroundTasks()
+
+    background_tasks.add_task(
+        _process_moysklad_webhook,
+        account_id=account_id,
         payload=payload,
-        paymentin_service=paymentin_service,
-        cashin_service=cashin_service,
-        paymentout_service=paymentout_service,
-        cashout_service=cashout_service,
-        customerorder_service=customerorder_service,
-        invoiceout_service=invoiceout_service,
-        demand_service=demand_service,
-        purchaseorder_service=purchaseorder_service,
-        invoicein_service=invoicein_service,
-        supply_service=supply_service,
+        request_id=request_id,
     )
 
     return Response(status_code=204)

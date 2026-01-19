@@ -1,11 +1,14 @@
 """Основной сервис для работы с вебхуками."""
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 from src.core.config import settings
 
 from ...ms_auth.services.auth_service import MySkladAuthService
+from sqlalchemy.exc import IntegrityError
+
 from ..domain.entities import WebhookOperationResult
 from ..domain.value_objects import WebhookConfiguration
 from ..exceptions import MissingRequestIdError, WebhookConfigurationError
@@ -560,3 +563,39 @@ class WebhookService:
                         event.accountId,
                         event.meta.type,
                     )
+
+    async def register_webhook_request(
+        self,
+        *,
+        request_id: str,
+        account_id: str | None,
+        events_count: int,
+    ) -> str:
+        now = datetime.now(timezone.utc)
+        await self._uow.webhook_requests.cleanup_expired(now)
+        existing = await self._uow.webhook_requests.get_by_request_id(request_id)
+
+        if existing and existing.expires_at >= now:
+            return "duplicate"
+
+        if existing:
+            await self._uow.webhook_requests.delete_by_request_id(request_id)
+
+        expires_at = now + timedelta(seconds=settings.webhook_request_ttl_seconds)
+        try:
+            await self._uow.webhook_requests.save(
+                request_id=request_id,
+                account_id=account_id,
+                events_count=events_count,
+                status="accepted",
+                expires_at=expires_at,
+            )
+            await self._uow.commit()
+        except IntegrityError:
+            await self._uow.rollback()
+            return "duplicate"
+        except Exception:
+            await self._uow.rollback()
+            raise
+
+        return "accepted"
