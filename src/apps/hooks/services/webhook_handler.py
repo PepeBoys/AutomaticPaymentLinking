@@ -2,8 +2,9 @@
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
+from src.apps.hooks.uow.unit_of_work import UnitOfWork
 from ...cashin.exceptions import CashInNotFoundError
 from ...cashin.services.cashin_service import CashInService
 from ...cashout.exceptions import CashOutNotFoundError
@@ -35,6 +36,7 @@ class WebhookHandler:
 
     def __init__(
         self,
+        uow: UnitOfWork,
         paymentin_service: PaymentInService,
         cashin_service: CashInService,
         paymentout_service: PaymentOutService,
@@ -46,6 +48,7 @@ class WebhookHandler:
         invoicein_service: InvoiceInService,
         supply_service: SupplyService,
     ):
+        self.uow = uow
         self.paymentin_service = paymentin_service
         self.cashin_service = cashin_service
         self.paymentout_service = paymentout_service
@@ -92,118 +95,136 @@ class WebhookHandler:
                     "payment_id": payment.id,
                 }
 
+            account_id = payment.account_id
+            await self.uow.pending_payment_links.cleanup_expired(datetime.now(timezone.utc))
+
             linked_documents = []
-            if subscription.link_type == LinkType.counterparty:
-                document, linked_sum, linked_documents = await self._link_payment_by_counterparty(
+            try:
+                if subscription.link_type == LinkType.counterparty:
+                    document, linked_sum, linked_documents = await self._link_payment_by_counterparty(
+                        payment_service=payment_service,
+                        payment=payment,
+                        account_id=account_id,
+                        document_type=subscription.document_type,
+                        organization_id=(
+                            payment.organization_id
+                            if subscription.check_document_organization
+                            else None
+                        ),
+                        prioritize_oldest=(
+                            subscription.document_priority == DocumentPriority.oldest_first
+                        ),
+                        payment_label=payment_label,
+                    )
+                else:
+                    document = await self._find_document_for_payment(
+                        payment=payment,
+                        account_id=account_id,
+                        document_type=subscription.document_type,
+                        link_type=subscription.link_type,
+                        payment_purpose_mask=subscription.payment_purpose_mask,
+                        organization_id=(
+                            payment.organization_id
+                            if subscription.check_document_organization
+                            else None
+                        ),
+                        prioritize_oldest=(
+                            subscription.document_priority == DocumentPriority.oldest_first
+                        ),
+                    )
+                    linked_sum = payment.sum if document else 0
+                    if document:
+                        linked_documents = [document]
+                        await self.uow.pending_payment_links.add_pending_link(
+                            account_id=account_id,
+                            document_id=document.id,
+                            payment_id=payment.id,
+                            linked_sum=linked_sum,
+                            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+                        )
+                        await self.uow.commit()
+
+                        await payment_service.link_to_document(
+                            payment_id=payment.id,
+                            document_meta_href=document.meta_href,
+                            linked_sum=payment.sum,
+                        )
+
+                if not document or linked_sum <= 0:
+                    logger.warning(
+                        "Не найден документ для %s %s (agent=%s, sum=%s, strategy=%s, type=%s)",
+                        payment_label,
+                        payment.id,
+                        payment.agent_id,
+                        payment.sum,
+                        subscription.link_type,
+                        subscription.document_type,
+                    )
+                    await self._apply_payment_state(
+                        payment_service,
+                        payment.id,
+                        subscription.payment_status_on_failure,
+                    )
+                    return {
+                        "success": False,
+                        "message": "Не найден подходящий документ для привязки",
+                    }
+
+                await self._apply_project_from_document(
                     payment_service=payment_service,
-                    payment=payment,
-                    document_type=subscription.document_type,
-                    organization_id=(
-                        payment.organization_id
-                        if subscription.check_document_organization
-                        else None
-                    ),
-                    prioritize_oldest=(
-                        subscription.document_priority == DocumentPriority.oldest_first
-                    ),
+                    payment_id=payment.id,
+                    document=document,
+                    transfer_project=subscription.transfer_project_to_payment,
                     payment_label=payment_label,
                 )
-            else:
-                document = await self._find_document_for_payment(
-                    payment=payment,
-                    document_type=subscription.document_type,
-                    link_type=subscription.link_type,
-                    payment_purpose_mask=subscription.payment_purpose_mask,
-                    organization_id=(
-                        payment.organization_id
-                        if subscription.check_document_organization
-                        else None
-                    ),
-                    prioritize_oldest=(
-                        subscription.document_priority == DocumentPriority.oldest_first
-                    ),
-                )
-                linked_sum = payment.sum if document else 0
-                if document:
-                    linked_documents = [document]
 
-            if not document or linked_sum <= 0:
-                logger.warning(
-                    "Не найден документ для %s %s (agent=%s, sum=%s, strategy=%s, type=%s)",
-                    payment_label,
+                await self._apply_sales_channel_from_document(
+                    payment_service=payment_service,
+                    payment_id=payment.id,
+                    document=document,
+                    transfer_sales_channel=subscription.transfer_sales_channel_to_payment,
+                    payment_label=payment_label,
+                )
+
+                logger.info(
+                    "✓ %s %s привязан к %s %s (сумма: %s)",
+                    payment_label.capitalize(),
                     payment.id,
-                    payment.agent_id,
+                    subscription.document_type.value,
+                    document.name,
                     payment.sum,
-                    subscription.link_type,
-                    subscription.document_type,
                 )
+
                 await self._apply_payment_state(
-                    payment_service,
-                    payment.id,
-                    subscription.payment_status_on_failure,
+                    payment_service, payment.id, subscription.payment_status_on_success
                 )
-                return {
-                    "success": False,
-                    "message": "Не найден подходящий документ для привязки",
+                await self._apply_document_states(
+                    linked_documents,
+                    subscription.document_type,
+                    subscription.document_status_on_success,
+                )
+
+                response = {
+                    "success": True,
+                    "message": (
+                        f"{payment_label.capitalize()} привязан к {subscription.document_type.value} {document.name}"
+                    ),
+                    "payment_id": payment.id,
+                    "document_id": document.id,
+                    "document_type": subscription.document_type.value,
                 }
 
-            if subscription.link_type != LinkType.counterparty:
-                await payment_service.link_to_document(
-                    payment_id=payment.id,
-                    document_meta_href=document.meta_href,
-                    linked_sum=payment.sum,
-                )
+                if subscription.document_type == DocumentType.customerorder:
+                    response["order_id"] = document.id
 
-            await self._apply_project_from_document(
-                payment_service=payment_service,
-                payment_id=payment.id,
-                document=document,
-                transfer_project=subscription.transfer_project_to_payment,
-                payment_label=payment_label,
-            )
+                return response
 
-            await self._apply_sales_channel_from_document(
-                payment_service=payment_service,
-                payment_id=payment.id,
-                document=document,
-                transfer_sales_channel=subscription.transfer_sales_channel_to_payment,
-                payment_label=payment_label,
-            )
+            except Exception as exc:
+                await self.uow.pending_payment_links.delete_by_payment_id(payment.id)
+                await self.uow.commit()
+                raise
 
-            logger.info(
-                "✓ %s %s привязан к %s %s (сумма: %s)",
-                payment_label.capitalize(),
-                payment.id,
-                subscription.document_type.value,
-                document.name,
-                payment.sum,
-            )
-
-            await self._apply_payment_state(
-                payment_service, payment.id, subscription.payment_status_on_success
-            )
-            await self._apply_document_states(
-                linked_documents,
-                subscription.document_type,
-                subscription.document_status_on_success,
-            )
-
-            response = {
-                "success": True,
-                "message": (
-                    f"{payment_label.capitalize()} привязан к {subscription.document_type.value} {document.name}"
-                ),
-                "payment_id": payment.id,
-                "document_id": document.id,
-                "document_type": subscription.document_type.value,
-            }
-
-            if subscription.document_type == DocumentType.customerorder:
-                response["order_id"] = document.id
-
-            return response
-
-        except not_found_exception as exc:  # type: ignore[misc]
+        except not_found_exception as exc:
             logger.warning(
                 "%s по ссылке %s не найден: %s",
                 payment_label.capitalize(),
@@ -229,7 +250,7 @@ class WebhookHandler:
                 subscription.payment_status_on_failure,
             )
             return {"success": False, "message": "Документ для привязки не найден"}
-        except Exception as exc:  # pragma: no cover - защитный блок
+        except Exception as exc:
             logger.exception("Ошибка при обработке %s: %s", payment_label, str(exc))
             raise
 
@@ -280,6 +301,7 @@ class WebhookHandler:
     async def _find_document_for_payment(
         self,
         payment,
+        account_id: str,
         document_type: DocumentType,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
@@ -291,6 +313,7 @@ class WebhookHandler:
         if document_type == DocumentType.customerorder:
             return await self._find_order_for_payment(
                 payment,
+                account_id,
                 link_type,
                 payment_purpose_mask,
                 organization_id,
@@ -300,6 +323,7 @@ class WebhookHandler:
         if document_type == DocumentType.invoiceout:
             return await self._find_invoice_for_payment(
                 payment,
+                account_id,
                 link_type,
                 payment_purpose_mask,
                 organization_id,
@@ -309,6 +333,7 @@ class WebhookHandler:
         if document_type == DocumentType.demand:
             return await self._find_demand_for_payment(
                 payment,
+                account_id,
                 link_type,
                 payment_purpose_mask,
                 organization_id,
@@ -318,6 +343,7 @@ class WebhookHandler:
         if document_type == DocumentType.purchaseorder:
             return await self._find_purchaseorder_for_payment(
                 payment,
+                account_id,
                 link_type,
                 payment_purpose_mask,
                 organization_id,
@@ -327,6 +353,7 @@ class WebhookHandler:
         if document_type == DocumentType.invoicein:
             return await self._find_invoicein_for_payment(
                 payment,
+                account_id,
                 link_type,
                 payment_purpose_mask,
                 organization_id,
@@ -336,6 +363,7 @@ class WebhookHandler:
         if document_type == DocumentType.supply:
             return await self._find_supply_for_payment(
                 payment,
+                account_id,
                 link_type,
                 payment_purpose_mask,
                 organization_id,
@@ -348,6 +376,7 @@ class WebhookHandler:
         self,
         payment_service,
         payment,
+        account_id: str,
         document_type: DocumentType,
         organization_id: str | None,
         prioritize_oldest: bool,
@@ -357,6 +386,7 @@ class WebhookHandler:
 
         documents = await self._get_documents_by_counterparty(
             payment=payment,
+            account_id=account_id,
             document_type=document_type,
             organization_id=organization_id,
             prioritize_oldest=prioritize_oldest,
@@ -368,10 +398,23 @@ class WebhookHandler:
         remaining_sum = payment.sum
         last_linked_document = None
         linked_documents: list = []
+        pending_links = []
 
         for document in documents:
-            unpaid_amount = document.get_unpaid_amount()
+            pending_sum = await self.uow.pending_payment_links.get_pending_sum_for_document(
+                account_id=account_id,
+                document_id=document.id,
+            )
+            unpaid_amount = document.get_unpaid_amount() - pending_sum
+
             if unpaid_amount <= 0:
+                logger.debug(
+                    "Документ %s полностью занят: payed=%s, pending=%s, sum=%s",
+                    document.name,
+                    document.payed_sum,
+                    pending_sum,
+                    document.sum,
+                )
                 continue
 
             linked_sum = min(unpaid_amount, remaining_sum)
@@ -379,22 +422,10 @@ class WebhookHandler:
             if linked_sum <= 0:
                 break
 
-            await payment_service.link_to_document(
-                payment_id=payment.id,
-                document_meta_href=document.meta_href,
-                linked_sum=linked_sum,
-            )
-
-            logger.info(
-                "Часть %s %s привязана к %s %s: linked_sum=%s, unpaid_before=%s, remaining_payment=%s",
-                payment_label,
-                payment.id,
-                document_type.value,
-                document.name,
-                linked_sum,
-                unpaid_amount,
-                remaining_sum - linked_sum,
-            )
+            pending_links.append({
+                "document": document,
+                "linked_sum": linked_sum,
+            })
 
             remaining_sum -= linked_sum
             last_linked_document = document
@@ -405,23 +436,40 @@ class WebhookHandler:
 
         if remaining_sum > 0 and documents:
             fallback_document = last_linked_document or documents[-1]
-            await payment_service.link_to_document(
-                payment_id=payment.id,
-                document_meta_href=fallback_document.meta_href,
-                linked_sum=remaining_sum,
-            )
-            logger.info(
-                "Остаток %s %s привязан к %s %s: linked_sum=%s",
-                payment_label,
-                payment.id,
-                document_type.value,
-                fallback_document.name,
-                remaining_sum,
-            )
+            pending_links.append({
+                "document": fallback_document,
+                "linked_sum": remaining_sum,
+            })
             if fallback_document not in linked_documents:
                 linked_documents.append(fallback_document)
             last_linked_document = fallback_document
             remaining_sum = 0
+
+        for link in pending_links:
+            await self.uow.pending_payment_links.add_pending_link(
+                account_id=account_id,
+                document_id=link["document"].id,
+                payment_id=payment.id,
+                linked_sum=link["linked_sum"],
+                expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+            )
+        await self.uow.commit()
+
+        for link in pending_links:
+            await payment_service.link_to_document(
+                payment_id=payment.id,
+                document_meta_href=link["document"].meta_href,
+                linked_sum=link["linked_sum"],
+            )
+
+            logger.info(
+                "Часть %s %s привязана к %s %s: linked_sum=%s",
+                payment_label,
+                payment.id,
+                document_type.value,
+                link["document"].name,
+                link["linked_sum"],
+            )
 
         total_linked = payment.sum - remaining_sum
         return last_linked_document, total_linked, linked_documents
@@ -465,7 +513,7 @@ class WebhookHandler:
                 payment_id,
                 document.name if document else "",
             )
-        except Exception as exc:  # pragma: no cover - сетевые ошибки
+        except Exception as exc:
             logger.warning(
                 "Не удалось перенести проект в %s %s: %s",
                 payment_label,
@@ -506,7 +554,7 @@ class WebhookHandler:
                 payment_id,
                 document.name if document else "",
             )
-        except Exception as exc:  # pragma: no cover - сетевые ошибки
+        except Exception as exc:
             logger.warning(
                 "Не удалось перенести канал продаж в %s %s: %s",
                 payment_label,
@@ -542,6 +590,7 @@ class WebhookHandler:
     async def _get_documents_by_counterparty(
         self,
         payment,
+        account_id: str,
         document_type: DocumentType,
         organization_id: str | None,
         prioritize_oldest: bool,
@@ -607,6 +656,7 @@ class WebhookHandler:
     async def _find_order_for_payment(
         self,
         payment,
+        account_id: str,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
         organization_id: str | None = None,
@@ -621,7 +671,14 @@ class WebhookHandler:
                 search_by_sum=True,
                 organization_id=organization_id,
             )
-            return orders[0] if orders else None
+            for order in orders:
+                pending_sum = await self.uow.pending_payment_links.get_pending_sum_for_document(
+                    account_id=account_id,
+                    document_id=order.id,
+                )
+                if order.get_unpaid_amount() - pending_sum >= payment.sum - 0.01:
+                    return order
+            return None
 
         elif link_type == LinkType.counterparty:
             orders = await self.customerorder_service.find_for_payment(
@@ -645,6 +702,7 @@ class WebhookHandler:
     async def _find_invoice_for_payment(
         self,
         payment,
+        account_id: str,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
         organization_id: str | None = None,
@@ -659,7 +717,14 @@ class WebhookHandler:
                 search_by_sum=True,
                 organization_id=organization_id,
             )
-            return invoices[0] if invoices else None
+            for invoice in invoices:
+                pending_sum = await self.uow.pending_payment_links.get_pending_sum_for_document(
+                    account_id=account_id,
+                    document_id=invoice.id,
+                )
+                if invoice.get_unpaid_amount() - pending_sum >= payment.sum - 0.01:
+                    return invoice
+            return None
 
         if link_type == LinkType.counterparty:
             invoices = await self.invoiceout_service.find_for_payment(
@@ -684,6 +749,7 @@ class WebhookHandler:
     async def _find_demand_for_payment(
         self,
         payment,
+        account_id: str,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
         organization_id: str | None = None,
@@ -698,7 +764,14 @@ class WebhookHandler:
                 search_by_sum=True,
                 organization_id=organization_id,
             )
-            return demands[0] if demands else None
+            for demand in demands:
+                pending_sum = await self.uow.pending_payment_links.get_pending_sum_for_document(
+                    account_id=account_id,
+                    document_id=demand.id,
+                )
+                if demand.get_unpaid_amount() - pending_sum >= payment.sum - 0.01:
+                    return demand
+            return None
 
         if link_type == LinkType.counterparty:
             demands = await self.demand_service.find_for_payment(
@@ -723,6 +796,7 @@ class WebhookHandler:
     async def _find_purchaseorder_for_payment(
         self,
         payment,
+        account_id: str,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
         organization_id: str | None = None,
@@ -737,7 +811,14 @@ class WebhookHandler:
                 search_by_sum=True,
                 organization_id=organization_id,
             )
-            return orders[0] if orders else None
+            for order in orders:
+                pending_sum = await self.uow.pending_payment_links.get_pending_sum_for_document(
+                    account_id=account_id,
+                    document_id=order.id,
+                )
+                if order.get_unpaid_amount() - pending_sum >= payment.sum - 0.01:
+                    return order
+            return None
 
         if link_type == LinkType.counterparty:
             orders = await self.purchaseorder_service.find_for_payment(
@@ -762,6 +843,7 @@ class WebhookHandler:
     async def _find_invoicein_for_payment(
         self,
         payment,
+        account_id: str,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
         organization_id: str | None = None,
@@ -776,7 +858,14 @@ class WebhookHandler:
                 search_by_sum=True,
                 organization_id=organization_id,
             )
-            return invoices[0] if invoices else None
+            for invoice in invoices:
+                pending_sum = await self.uow.pending_payment_links.get_pending_sum_for_document(
+                    account_id=account_id,
+                    document_id=invoice.id,
+                )
+                if invoice.get_unpaid_amount() - pending_sum >= payment.sum - 0.01:
+                    return invoice
+            return None
 
         if link_type == LinkType.counterparty:
             invoices = await self.invoicein_service.find_for_payment(
@@ -801,6 +890,7 @@ class WebhookHandler:
     async def _find_supply_for_payment(
         self,
         payment,
+        account_id: str,
         link_type: LinkType,
         payment_purpose_mask: str | None = None,
         organization_id: str | None = None,
@@ -815,7 +905,14 @@ class WebhookHandler:
                 search_by_sum=True,
                 organization_id=organization_id,
             )
-            return supplies[0] if supplies else None
+            for supply in supplies:
+                pending_sum = await self.uow.pending_payment_links.get_pending_sum_for_document(
+                    account_id=account_id,
+                    document_id=supply.id,
+                )
+                if supply.get_unpaid_amount() - pending_sum >= payment.sum - 0.01:
+                    return supply
+            return None
 
         if link_type == LinkType.counterparty:
             supplies = await self.supply_service.find_for_payment(

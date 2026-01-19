@@ -156,3 +156,49 @@ def _apply_manual_migrations(sync_conn) -> None:
             "CREATE INDEX IF NOT EXISTS ix_webhookprocessinglocks_expires_at "
             "ON webhookprocessinglocks (expires_at)"
         )
+
+    if "pendingpaymentlinks" not in inspector.get_table_names():
+        sync_conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS pendingpaymentlinks ("
+            "id INTEGER PRIMARY KEY, "
+            "account_id VARCHAR(64) NOT NULL, "
+            "document_id VARCHAR(64) NOT NULL, "
+            "payment_id VARCHAR(64) NOT NULL, "
+            "linked_sum REAL NOT NULL, "
+            "expires_at DATETIME NOT NULL, "
+            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+            "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+            "is_active BOOLEAN NOT NULL DEFAULT 1, "
+            "CHECK (account_id IS NOT NULL AND account_id != ''), "
+            "CHECK (document_id IS NOT NULL AND document_id != ''), "
+            "CHECK (linked_sum > 0)"
+            ")"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_pendingpaymentlinks_id "
+            "ON pendingpaymentlinks (id)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_pendingpaymentlinks_account_id "
+            "ON pendingpaymentlinks (account_id)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_pendingpaymentlinks_document_id "
+            "ON pendingpaymentlinks (document_id)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_pendingpaymentlinks_payment_id "
+            "ON pendingpaymentlinks (payment_id)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_pendingpaymentlinks_expires_at "
+            "ON pendingpaymentlinks (expires_at)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_pendingpaymentlinks_is_active "
+            "ON pendingpaymentlinks (is_active)"
+        )
+        sync_conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_pending_link_account_document "
+            "ON pendingpaymentlinks (account_id, document_id)"
+        )

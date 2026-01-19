@@ -4,6 +4,9 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..repositories.pending_payment_link_repository import (
+    PendingPaymentLinkRepository,
+)
 from ..repositories.webhook_processing_lock_repository import (
     WebhookProcessingLockRepository,
 )
@@ -32,6 +35,7 @@ class UnitOfWork:
         self._webhooks: Optional[WebhookRepository] = None
         self._webhook_processing_locks: Optional[WebhookProcessingLockRepository] = None
         self._webhook_requests: Optional[WebhookRequestRepository] = None
+        self._pending_payment_links: Optional[PendingPaymentLinkRepository] = None
         self._committed = False
     
     @property
@@ -48,17 +52,28 @@ class UnitOfWork:
 
     @property
     def webhook_requests(self) -> WebhookRequestRepository:
+        """Получить репозиторий webhook запросов."""
         if self._webhook_requests is None:
             self._webhook_requests = WebhookRequestRepository(self._session)
         return self._webhook_requests
 
     @property
     def webhook_processing_locks(self) -> WebhookProcessingLockRepository:
+        """Получить репозиторий блокировок обработки."""
         if self._webhook_processing_locks is None:
             self._webhook_processing_locks = WebhookProcessingLockRepository(
                 self._session
             )
         return self._webhook_processing_locks
+
+    @property
+    def pending_payment_links(self) -> PendingPaymentLinkRepository:
+        """Получить репозиторий pending привязок."""
+        if self._pending_payment_links is None:
+            self._pending_payment_links = PendingPaymentLinkRepository(
+                self._session
+            )
+        return self._pending_payment_links
     
     async def commit(self) -> None:
         """Зафиксировать изменения в БД."""

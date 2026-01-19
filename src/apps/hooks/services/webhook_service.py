@@ -430,6 +430,7 @@ class WebhookService:
             raise ValueError("SupplyService dependency is required")
 
         handler = WebhookHandler(
+            self._uow,
             paymentin_service,
             cashin_service,
             paymentout_service,

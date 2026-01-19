@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Integer
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Float, Integer
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import Index, String
 
@@ -126,5 +126,35 @@ class WebhookRequest(Base):
         CheckConstraint(
             "request_id IS NOT NULL AND request_id != ''",
             name="ck_webhook_request_id_not_empty",
+        ),
+    )
+
+
+class PendingPaymentLink(Base):
+    """Временная таблица для отслеживания запланированных привязок платежей к документам."""
+
+    account_id = Column(String(64), nullable=False, index=True)
+    document_id = Column(String(64), nullable=False, index=True)
+    payment_id = Column(String(64), nullable=False, index=True)
+    linked_sum = Column(Float, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    __table_args__ = (
+        Index(
+            "ix_pending_link_account_document",
+            "account_id",
+            "document_id",
+        ),
+        CheckConstraint(
+            "account_id IS NOT NULL AND account_id != ''",
+            name="ck_pending_link_account_id_not_empty",
+        ),
+        CheckConstraint(
+            "document_id IS NOT NULL AND document_id != ''",
+            name="ck_pending_link_document_id_not_empty",
+        ),
+        CheckConstraint(
+            "linked_sum > 0",
+            name="ck_pending_link_positive_sum",
         ),
     )
