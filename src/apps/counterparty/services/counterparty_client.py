@@ -107,8 +107,37 @@ class CounterpartyClient:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
+    async def list_attributes(self) -> list[Dict[str, Any]]:
+        """Получить список доп. полей (атрибутов метаданных) контрагента."""
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/{self.entity_type}/metadata/attributes"
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, list):
+                    return data
+                return data.get("rows", [])
+        except httpx.HTTPStatusError as exc:
+            raise CounterpartyAPIError(
+                "Ошибка HTTP при получении доп. полей контрагента",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:
+            raise CounterpartyAPIError(
+                "Ошибка при получении доп. полей контрагента",
+                details={"error": str(exc)},
+            ) from exc
+
     async def create_attribute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Создать доп. поле (атрибут метаданных) контрагента."""
+        """Создать доп. поле (атрибут метаданных) контрагента.
+
+        Без tenacity-ретрая: создание не идемпотентно, а на 4xx (например 412
+        «уже существует») повтор бессмысленен.
+        """
         try:
             base_url = self._get_base_url()
             headers = self._get_headers()
@@ -120,9 +149,14 @@ class CounterpartyClient:
                 resp.raise_for_status()
                 return resp.json()
         except httpx.HTTPStatusError as exc:
+            body = exc.response.text[:1000] if exc.response is not None else None
             raise CounterpartyAPIError(
                 "Ошибка HTTP при создании доп. поля контрагента",
-                details={"status_code": exc.response.status_code, "error": str(exc)},
+                details={
+                    "status_code": exc.response.status_code,
+                    "error": str(exc),
+                    "response": body,
+                },
             ) from exc
         except Exception as exc:
             raise CounterpartyAPIError(

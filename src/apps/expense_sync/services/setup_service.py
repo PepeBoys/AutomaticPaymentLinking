@@ -113,22 +113,46 @@ class ExpenseItemSetupService:
         result.elements_skipped = skipped
         await self._uow.commit()
 
-        # 3. Доп. поле контрагента
+        # 3. Доп. поле контрагента (adopt-or-create + защита от коллизии имени)
         if not attribute_id:
-            attribute = await self._counterparty_service.create_customentity_attribute(
-                name=COUNTERPARTY_ATTRIBUTE_NAME,
-                customentity_metadata_id=mirror_id,
+            existing_attr = await self._counterparty_service.find_customentity_attribute_by_name(
+                COUNTERPARTY_ATTRIBUTE_NAME
             )
-            attribute_id = attribute.get("id")
-            await self._uow.configs.upsert(
-                account_id, counterparty_attribute_id=attribute_id
-            )
-            await self._uow.commit()
-            logger.info(
-                "Создано доп. поле контрагента: account_id=%s, attribute_id=%s",
-                account_id,
-                attribute_id,
-            )
+
+            if existing_attr is None:
+                attribute = await self._counterparty_service.create_customentity_attribute(
+                    name=COUNTERPARTY_ATTRIBUTE_NAME,
+                    customentity_metadata_id=mirror_id,
+                )
+                attribute_id = attribute.get("id")
+                logger.info(
+                    "Создано доп. поле контрагента: account_id=%s, attribute_id=%s",
+                    account_id,
+                    attribute_id,
+                )
+            elif existing_attr.get("customentity_id") == mirror_id:
+                # Наше же поле — идемпотентный повторный запуск, переиспользуем.
+                attribute_id = existing_attr.get("id")
+                logger.info(
+                    "Доп. поле контрагента уже существует, переиспользуем: %s",
+                    attribute_id,
+                )
+            else:
+                msg = (
+                    f"Доп. поле контрагента «{COUNTERPARTY_ATTRIBUTE_NAME}» уже существует "
+                    f"(id={existing_attr.get('id')}) и ссылается на другой справочник "
+                    f"({existing_attr.get('customentity_id')}), а не на зеркало ({mirror_id}). "
+                    "Удалите или переименуйте это поле в МойСклад и повторите инициализацию."
+                )
+                result.errors.append(msg)
+                logger.warning(msg)
+
+            if attribute_id:
+                await self._uow.configs.upsert(
+                    account_id, counterparty_attribute_id=attribute_id
+                )
+                await self._uow.commit()
+
         result.counterparty_attribute_id = attribute_id
 
         # 4. Вебхуки синхронизации

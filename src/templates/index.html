@@ -96,6 +96,7 @@
                     </div>
                     {% set payment_type = "outgoing_payment" %}
                     {% include "partials/link_settings.html" %}
+                    {% include "partials/expense_item_settings.html" %}
                 </div>
 
                 <!-- Расходный ордер -->
@@ -119,48 +120,8 @@
                     </div>
                     {% set payment_type = "outgoing_order" %}
                     {% include "partials/link_settings.html" %}
+                    {% include "partials/expense_item_settings.html" %}
                 </div>
-            </div>
-        </div>
-
-        <!-- Статья расходов из контрагента -->
-        <div class="settings-card" style="margin-top: 32px;">
-            <div class="section-title">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                    <path d="M5 8h6M5 11h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                Статья расходов из контрагента
-            </div>
-
-            <p class="caption" style="margin: 8px 0 16px; max-width: 680px; color: #6b7280;">
-                Создаёт пользовательский справочник — копию статей расходов — и доп. поле контрагента,
-                ссылающееся на него, и поддерживает их синхронизацию. После того как вы заполните это
-                поле у контрагентов, статья расходов будет автоматически проставляться в Исходящие
-                платежи и Расходные ордера по их контрагенту.
-            </p>
-
-            <div class="js-expense-sync-status-line caption" style="margin-bottom: 16px; font-size: 13px; color: #6b7280;">
-                Загрузка...
-            </div>
-
-            <label class="check option" style="margin-bottom: 16px;">
-                <input class="check__input js-expense-sync-toggle" type="checkbox" disabled>
-                <span class="check__box"></span>
-                <span class="check__text">
-                    Проставлять статью расходов в Исходящий платеж и Расходный ордер
-                    <span class="help-tip" tabindex="0">
-                        <span class="help-icon" aria-hidden="true">?</span>
-                        <span class="help-tooltip">Берёт значение из доп. поля контрагента и ставит соответствующую статью расходов в документ.</span>
-                    </span>
-                </span>
-            </label>
-
-            <div class="settings-actions" style="display: flex; align-items: center; gap: 12px;">
-                <button type="button" class="ui-button ui-button--primary js-expense-sync-init">
-                    Инициализировать справочник
-                </button>
-                <span class="js-expense-sync-feedback caption" style="font-size: 12px;"></span>
             </div>
         </div>
 
@@ -738,126 +699,134 @@
         });
 
         // ===== Статья расходов из контрагента =====
-        const expenseSyncToggle = document.querySelector('.js-expense-sync-toggle');
-        const expenseSyncInitBtn = document.querySelector('.js-expense-sync-init');
-        const expenseSyncStatusLine = document.querySelector('.js-expense-sync-status-line');
-        const expenseSyncFeedback = document.querySelector('.js-expense-sync-feedback');
+        // Карточка дублируется во вкладках "Исходящий платеж" и "Расходный ордер",
+        // но настройка одна (аккаунт-глобальная) — поэтому работаем со всеми
+        // экземплярами сразу и держим их синхронными.
+        const expenseSyncToggles = document.querySelectorAll('.js-expense-sync-toggle');
+        const expenseSyncInitBtns = document.querySelectorAll('.js-expense-sync-init');
+        const expenseSyncStatusLines = document.querySelectorAll('.js-expense-sync-status-line');
+        const expenseSyncFeedbacks = document.querySelectorAll('.js-expense-sync-feedback');
         let expenseSyncBusy = false;
 
-        function renderExpenseSyncStatus(data) {
-            if (!expenseSyncStatusLine) return;
+        function setExpenseSyncFeedback(text, color) {
+            expenseSyncFeedbacks.forEach((el) => {
+                el.textContent = text;
+                if (color) el.style.color = color;
+            });
+        }
 
-            if (data && data.initialized) {
-                expenseSyncStatusLine.textContent =
-                    'Справочник создан. Синхронизировано статей: ' + (data.mappings_count || 0) + '.';
-                expenseSyncStatusLine.style.color = '#059669';
-                if (expenseSyncToggle) {
-                    expenseSyncToggle.disabled = false;
-                    expenseSyncToggle.checked = Boolean(data.enabled);
+        function renderExpenseSyncStatus(data) {
+            const initialized = Boolean(data && data.initialized);
+
+            expenseSyncStatusLines.forEach((line) => {
+                if (initialized) {
+                    line.textContent =
+                        'Справочник создан. Синхронизировано статей: ' + (data.mappings_count || 0) + '.';
+                    line.style.color = '#059669';
+                } else {
+                    line.textContent = 'Справочник ещё не создан. Нажмите «Инициализировать справочник».';
+                    line.style.color = '#6b7280';
                 }
-                if (expenseSyncInitBtn) expenseSyncInitBtn.textContent = 'Обновить справочник';
-            } else {
-                expenseSyncStatusLine.textContent =
-                    'Справочник ещё не создан. Нажмите «Инициализировать справочник».';
-                expenseSyncStatusLine.style.color = '#6b7280';
-                if (expenseSyncToggle) {
-                    expenseSyncToggle.disabled = true;
-                    expenseSyncToggle.checked = false;
-                }
-                if (expenseSyncInitBtn) expenseSyncInitBtn.textContent = 'Инициализировать справочник';
-            }
+            });
+
+            expenseSyncToggles.forEach((cb) => {
+                cb.disabled = !initialized;
+                cb.checked = initialized ? Boolean(data.enabled) : false;
+            });
+
+            expenseSyncInitBtns.forEach((btn) => {
+                btn.textContent = initialized ? 'Обновить справочник' : 'Инициализировать справочник';
+            });
         }
 
         function loadExpenseSyncStatus() {
+            if (!expenseSyncToggles.length) return;
+
             fetch(buildApiUrl('/api/expense-sync/status'), { headers: buildHeaders() })
                 .then((response) => response.json())
                 .then(renderExpenseSyncStatus)
                 .catch((error) => {
                     console.error('Ошибка загрузки статуса синхронизации статей:', error);
-                    if (expenseSyncStatusLine) {
-                        expenseSyncStatusLine.textContent = 'Не удалось загрузить статус.';
-                        expenseSyncStatusLine.style.color = '#ef4444';
-                    }
+                    expenseSyncStatusLines.forEach((line) => {
+                        line.textContent = 'Не удалось загрузить статус.';
+                        line.style.color = '#ef4444';
+                    });
                 });
         }
 
-        if (expenseSyncInitBtn) {
-            expenseSyncInitBtn.addEventListener('click', () => {
-                if (expenseSyncBusy) return;
+        function runExpenseSyncInit() {
+            if (expenseSyncBusy) return;
 
-                expenseSyncBusy = true;
-                expenseSyncInitBtn.disabled = true;
-                if (expenseSyncFeedback) {
-                    expenseSyncFeedback.textContent = 'Инициализация...';
-                    expenseSyncFeedback.style.color = '#6b7280';
-                }
+            expenseSyncBusy = true;
+            expenseSyncInitBtns.forEach((b) => (b.disabled = true));
+            setExpenseSyncFeedback('Инициализация...', '#6b7280');
 
-                fetch(buildApiUrl('/api/expense-sync/init'), {
-                    method: 'POST',
-                    headers: buildHeaders({ 'Content-Type': 'application/json' }),
+            fetch(buildApiUrl('/api/expense-sync/init'), {
+                method: 'POST',
+                headers: buildHeaders({ 'Content-Type': 'application/json' }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    const created = data.elements_created || 0;
+                    const skipped = data.elements_skipped || 0;
+                    let message = 'Готово. Создано элементов: ' + created + ', пропущено: ' + skipped + '.';
+                    let color = '#059669';
+
+                    if (data.errors && data.errors.length) {
+                        message += ' Предупреждения: ' + data.errors.join('; ');
+                        color = '#d97706';
+                    }
+
+                    setExpenseSyncFeedback(message, color);
+                    loadExpenseSyncStatus();
                 })
-                    .then((response) => response.json())
-                    .then((data) => {
-                        const created = data.elements_created || 0;
-                        const skipped = data.elements_skipped || 0;
-                        let message = 'Готово. Создано элементов: ' + created + ', пропущено: ' + skipped + '.';
-
-                        if (data.errors && data.errors.length) {
-                            message += ' Предупреждения: ' + data.errors.join('; ');
-                            if (expenseSyncFeedback) expenseSyncFeedback.style.color = '#d97706';
-                        } else if (expenseSyncFeedback) {
-                            expenseSyncFeedback.style.color = '#059669';
-                        }
-
-                        if (expenseSyncFeedback) expenseSyncFeedback.textContent = message;
-                        loadExpenseSyncStatus();
-                    })
-                    .catch((error) => {
-                        console.error('Ошибка инициализации справочника статей:', error);
-                        if (expenseSyncFeedback) {
-                            expenseSyncFeedback.textContent = 'Ошибка инициализации.';
-                            expenseSyncFeedback.style.color = '#ef4444';
-                        }
-                    })
-                    .finally(() => {
-                        expenseSyncBusy = false;
-                        expenseSyncInitBtn.disabled = false;
-                    });
-            });
+                .catch((error) => {
+                    console.error('Ошибка инициализации справочника статей:', error);
+                    setExpenseSyncFeedback('Ошибка инициализации.', '#ef4444');
+                })
+                .finally(() => {
+                    expenseSyncBusy = false;
+                    expenseSyncInitBtns.forEach((b) => (b.disabled = false));
+                });
         }
 
-        if (expenseSyncToggle) {
-            expenseSyncToggle.addEventListener('change', function () {
-                const enabled = this.checked;
-                this.disabled = true;
+        function runExpenseSyncToggle(enabled) {
+            expenseSyncToggles.forEach((cb) => (cb.disabled = true));
 
-                fetch(buildApiUrl('/api/expense-sync/toggle'), {
-                    method: 'POST',
-                    headers: buildHeaders({ 'Content-Type': 'application/json' }),
-                    body: JSON.stringify({ enabled }),
+            fetch(buildApiUrl('/api/expense-sync/toggle'), {
+                method: 'POST',
+                headers: buildHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ enabled }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.status === 'warning') {
+                        expenseSyncToggles.forEach((cb) => (cb.checked = false));
+                        alert(data.message || 'Не удалось включить');
+                    } else {
+                        expenseSyncToggles.forEach((cb) => (cb.checked = enabled));
+                        setExpenseSyncFeedback(
+                            enabled ? 'Автопроставление включено.' : 'Автопроставление выключено.',
+                            '#059669'
+                        );
+                    }
                 })
-                    .then((response) => response.json())
-                    .then((data) => {
-                        if (data.status === 'warning') {
-                            this.checked = false;
-                            alert(data.message || 'Не удалось включить');
-                        } else if (expenseSyncFeedback) {
-                            expenseSyncFeedback.textContent = enabled
-                                ? 'Автопроставление включено.'
-                                : 'Автопроставление выключено.';
-                            expenseSyncFeedback.style.color = '#059669';
-                        }
-                    })
-                    .catch((error) => {
-                        console.error('Ошибка переключения автопроставления:', error);
-                        this.checked = !enabled;
-                        alert('Ошибка связи с сервером');
-                    })
-                    .finally(() => {
-                        this.disabled = false;
-                    });
-            });
+                .catch((error) => {
+                    console.error('Ошибка переключения автопроставления:', error);
+                    expenseSyncToggles.forEach((cb) => (cb.checked = !enabled));
+                    alert('Ошибка связи с сервером');
+                })
+                .finally(() => {
+                    expenseSyncToggles.forEach((cb) => (cb.disabled = false));
+                });
         }
+
+        expenseSyncInitBtns.forEach((btn) => btn.addEventListener('click', runExpenseSyncInit));
+        expenseSyncToggles.forEach((cb) =>
+            cb.addEventListener('change', function () {
+                runExpenseSyncToggle(this.checked);
+            })
+        );
 
         loadExpenseSyncStatus();
     });

@@ -1,0 +1,40 @@
+<!-- Статья расходов из контрагента (настройка аккаунт-глобальная, общая для обеих вкладок) -->
+<div class="settings-card js-expense-sync-card" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+    <div class="section-title">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M5 8h6M5 11h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Статья расходов из контрагента
+    </div>
+
+    <p class="caption" style="margin: 8px 0 16px; max-width: 680px; color: #6b7280;">
+        Создаёт пользовательский справочник — копию статей расходов — и доп. поле контрагента,
+        ссылающееся на него, и поддерживает их синхронизацию. После того как вы заполните это
+        поле у контрагентов, статья расходов будет автоматически проставляться в Исходящие
+        платежи и Расходные ордера по их контрагенту.
+    </p>
+
+    <div class="js-expense-sync-status-line caption" style="margin-bottom: 16px; font-size: 13px; color: #6b7280;">
+        Загрузка...
+    </div>
+
+    <label class="check option" style="margin-bottom: 16px;">
+        <input class="check__input js-expense-sync-toggle" type="checkbox" disabled>
+        <span class="check__box"></span>
+        <span class="check__text">
+            Проставлять статью расходов в Исходящий платеж и Расходный ордер
+            <span class="help-tip" tabindex="0">
+                <span class="help-icon" aria-hidden="true">?</span>
+                <span class="help-tooltip">Берёт значение из доп. поля контрагента и ставит соответствующую статью расходов в документ.</span>
+            </span>
+        </span>
+    </label>
+
+    <div class="settings-actions" style="display: flex; align-items: center; gap: 12px;">
+        <button type="button" class="ui-button ui-button--primary js-expense-sync-init">
+            Инициализировать справочник
+        </button>
+        <span class="js-expense-sync-feedback caption" style="font-size: 12px;"></span>
+    </div>
+</div>

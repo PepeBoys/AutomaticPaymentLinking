@@ -30,6 +30,40 @@ class CounterpartyService:
         """Получить сырые метаданные контрагента."""
         return await self._client.get_metadata()
 
+    async def find_customentity_attribute_by_name(
+        self, name: str
+    ) -> Optional[dict]:
+        """Найти доп. поле типа «справочник» (customentity) по имени.
+
+        Возвращает сырой объект доп. поля (содержит id, customEntityMeta) или
+        None. Дополнительно проставляет ключ ``customentity_id`` — id справочника,
+        на который ссылается поле.
+        """
+        attributes = await self._client.list_attributes()
+        for attr in attributes:
+            if attr.get("type") == "customentity" and attr.get("name") == name:
+                attr = dict(attr)
+                href = attr.get("customEntityMeta", {}).get("href", "")
+                attr["customentity_id"] = self._extract_customentity_id(href)
+                return attr
+        return None
+
+    @staticmethod
+    def _extract_customentity_id(href: str) -> Optional[str]:
+        """Извлечь id справочника из customEntityMeta.href.
+
+        МС использует два вида ссылок:
+        - .../entity/customentity/{id}/metadata
+        - .../context/companysettings/metadata/customEntities/{id}
+        """
+        if not href:
+            return None
+        if "/customEntities/" in href:
+            return href.split("/customEntities/")[-1].split("/")[0]
+        if "/customentity/" in href:
+            return href.split("/customentity/")[-1].split("/")[0]
+        return None
+
     async def create_customentity_attribute(
         self,
         name: str,
