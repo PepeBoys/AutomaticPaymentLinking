@@ -22,3 +22,4 @@ class BasePaymentEntity:
     meta_href: str
     project_meta_href: Optional[str] = None
     sales_channel_meta_href: Optional[str] = None
+    expense_item_meta_href: Optional[str] = None

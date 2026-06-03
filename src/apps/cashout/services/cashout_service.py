@@ -39,6 +39,9 @@ class CashOutService(BasePaymentService[CashOutEntity, BasePaymentClient]):
             sales_channel_meta.get("href") if sales_channel_meta else None
         )
 
+        expense_item_meta = data.get("expenseItem", {}).get("meta", {})
+        expense_item_href = expense_item_meta.get("href") if expense_item_meta else None
+
         linked_ops = [
             {
                 "meta": {
@@ -64,4 +67,5 @@ class CashOutService(BasePaymentService[CashOutEntity, BasePaymentClient]):
             meta_href=data["meta"]["href"],
             project_meta_href=project_href,
             sales_channel_meta_href=sales_channel_href,
+            expense_item_meta_href=expense_item_href,
         )

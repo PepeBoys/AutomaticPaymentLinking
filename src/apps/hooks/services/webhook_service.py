@@ -387,6 +387,7 @@ class WebhookService:
         purchaseorder_service=None,
         invoicein_service=None,
         supply_service=None,
+        expense_sync_handler=None,
     ) -> None:
         """
         Обработать входящий webhook от МойСклад.
@@ -499,6 +500,13 @@ class WebhookService:
                         event.meta.type,
                     )
             elif event.meta.type == "paymentout" and event.action == "CREATE":
+                if expense_sync_handler is not None:
+                    await expense_sync_handler.apply_expense_item_to_payment(
+                        account_id=event.accountId,
+                        href=event.meta.href,
+                        payment_service=paymentout_service,
+                    )
+
                 subscription = await self._uow.webhooks.get_active_subscription_for_event(
                     account_id=event.accountId,
                     entity_type=event.meta.type,
@@ -530,6 +538,13 @@ class WebhookService:
                         event.meta.type,
                     )
             elif event.meta.type == "cashout" and event.action == "CREATE":
+                if expense_sync_handler is not None:
+                    await expense_sync_handler.apply_expense_item_to_payment(
+                        account_id=event.accountId,
+                        href=event.meta.href,
+                        payment_service=cashout_service,
+                    )
+
                 subscription = await self._uow.webhooks.get_active_subscription_for_event(
                     account_id=event.accountId,
                     entity_type=event.meta.type,
@@ -559,4 +574,18 @@ class WebhookService:
                         "Активная подписка не найдена для аккаунта %s и типа %s",
                         event.accountId,
                         event.meta.type,
+                    )
+            elif event.meta.type == "expenseitem":
+                if expense_sync_handler is not None:
+                    await expense_sync_handler.handle_expenseitem_event(
+                        account_id=event.accountId,
+                        action=event.action,
+                        href=event.meta.href,
+                    )
+            elif event.meta.type == "customentity":
+                if expense_sync_handler is not None:
+                    await expense_sync_handler.handle_customentity_event(
+                        account_id=event.accountId,
+                        action=event.action,
+                        href=event.meta.href,
                     )
