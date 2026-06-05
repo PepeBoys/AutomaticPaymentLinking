@@ -1,4 +1,28 @@
 <!-- Статья расходов из контрагента (настройка аккаунт-глобальная, общая для обеих вкладок) -->
+<style>
+    .expense-sync-status { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; min-height: 18px; }
+    .expense-sync-status__dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; flex: 0 0 auto; transition: background-color .2s; }
+    .js-expense-sync-status-line { transition: opacity .25s ease; }
+
+    .expense-diff { margin-top: 16px; }
+    .expense-diff__body {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 12.5px; line-height: 1.75;
+        background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+        padding: 8px 12px; overflow-x: auto;
+    }
+    .expense-diff__row { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; padding: 0 4px; border-radius: 3px; cursor: help; }
+    .expense-diff__m { flex: 0 0 auto; width: 1ch; text-align: center; font-weight: 700; }
+    .expense-diff__n { flex: 0 0 auto; color: #111827; }
+    .expense-diff__a { flex: 1 1 auto; color: #9ca3af; }
+    .expense-diff__row--add { background: rgba(22, 163, 74, .07); }
+    .expense-diff__row--add .expense-diff__m { color: #16a34a; }
+    .expense-diff__row--del { background: rgba(220, 38, 38, .07); }
+    .expense-diff__row--del .expense-diff__m { color: #dc2626; }
+    .expense-diff__row--mod { background: rgba(217, 119, 6, .08); }
+    .expense-diff__row--mod .expense-diff__m { color: #d97706; }
+    .expense-diff__row--info .expense-diff__m { color: #9ca3af; }
+</style>
 <div class="settings-card js-expense-sync-card" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
     <div class="section-title">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -15,11 +39,18 @@
         платежи и Расходные ордера по их контрагенту.
     </p>
 
-    <div class="js-expense-sync-status-line caption" style="margin-bottom: 16px; font-size: 13px; color: #6b7280;">
-        Загрузка...
+    <div class="expense-sync-status">
+        <span class="expense-sync-status__dot js-expense-sync-status-dot"></span>
+        <span class="js-expense-sync-status-line caption" style="font-size: 13px; color: #6b7280;">Загрузка...</span>
     </div>
 
-    <label class="check option" style="margin-bottom: 16px;">
+    <div class="settings-actions" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <button type="button" class="ui-button ui-button--primary js-expense-sync-init">
+            Инициализировать справочник
+        </button>
+    </div>
+
+    <label class="check option">
         <input class="check__input js-expense-sync-toggle" type="checkbox" disabled>
         <span class="check__box"></span>
         <span class="check__text">
@@ -31,10 +62,5 @@
         </span>
     </label>
 
-    <div class="settings-actions" style="display: flex; align-items: center; gap: 12px;">
-        <button type="button" class="ui-button ui-button--primary js-expense-sync-init">
-            Инициализировать справочник
-        </button>
-        <span class="js-expense-sync-feedback caption" style="font-size: 12px;"></span>
-    </div>
+    <div class="js-expense-sync-diff expense-diff"></div>
 </div>

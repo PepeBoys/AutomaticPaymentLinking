@@ -11,6 +11,28 @@ class ExpenseSyncStatusResponse(BaseModel):
     mirror_customentity_id: Optional[str] = None
     counterparty_attribute_id: Optional[str] = None
     mappings_count: int = 0
+    diagnostic: str = "ok"
+    message: Optional[str] = None
+
+
+class ExpenseSyncDiffEntry(BaseModel):
+    expenseitem_id: Optional[str] = None
+    element_id: Optional[str] = None
+    source_name: Optional[str] = None
+    mirror_name: Optional[str] = None
+    changed_fields: List[str] = []
+
+
+class ExpenseSyncDiffResponse(BaseModel):
+    status: str
+    in_sync: bool
+    source_count: int = 0
+    mirror_count: int = 0
+    missing_in_mirror: List[ExpenseSyncDiffEntry] = []
+    orphan_in_mirror: List[ExpenseSyncDiffEntry] = []
+    changed: List[ExpenseSyncDiffEntry] = []
+    extra_in_mirror: List[ExpenseSyncDiffEntry] = []
+    duplicate_in_mirror: List[ExpenseSyncDiffEntry] = []
 
 
 class ExpenseSyncTogglePayload(BaseModel):

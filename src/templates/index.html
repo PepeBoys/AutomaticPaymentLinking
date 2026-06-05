@@ -12,6 +12,8 @@
             Автоматически связывает входящие платежи с документами в МойСклад
         </p>
 
+        {% include "partials/expense_item_settings.html" %}
+
         <div class="tabs-border js-tabs" style="margin-top: 24px;">
             <ul class="tabs-border__buttons">
                 <li class="tabs-border__button js-tabs-button b-active">
@@ -96,7 +98,6 @@
                     </div>
                     {% set payment_type = "outgoing_payment" %}
                     {% include "partials/link_settings.html" %}
-                    {% include "partials/expense_item_settings.html" %}
                 </div>
 
                 <!-- Расходный ордер -->
@@ -120,7 +121,6 @@
                     </div>
                     {% set payment_type = "outgoing_order" %}
                     {% include "partials/link_settings.html" %}
-                    {% include "partials/expense_item_settings.html" %}
                 </div>
             </div>
         </div>
@@ -705,29 +705,52 @@
         const expenseSyncToggles = document.querySelectorAll('.js-expense-sync-toggle');
         const expenseSyncInitBtns = document.querySelectorAll('.js-expense-sync-init');
         const expenseSyncStatusLines = document.querySelectorAll('.js-expense-sync-status-line');
-        const expenseSyncFeedbacks = document.querySelectorAll('.js-expense-sync-feedback');
+        const expenseSyncStatusDots = document.querySelectorAll('.js-expense-sync-status-dot');
+        const expenseSyncDiffBoxes = document.querySelectorAll('.js-expense-sync-diff');
         let expenseSyncBusy = false;
 
-        function setExpenseSyncFeedback(text, color) {
-            expenseSyncFeedbacks.forEach((el) => {
-                el.textContent = text;
-                if (color) el.style.color = color;
+        // Единая строка статуса: постоянное состояние + транзиентные сообщения,
+        // которые сами гаснут и возвращают постоянный текст (меньше визуального шума).
+        let expenseSyncPersistent = { text: 'Загрузка...', color: '#6b7280', dot: '#9ca3af' };
+        let expenseSyncFlashTimer = null;
+
+        function expenseSyncPlural(n, one, few, many) {
+            const d10 = n % 10, d100 = n % 100;
+            if (d10 === 1 && d100 !== 11) return one;
+            if (d10 >= 2 && d10 <= 4 && (d100 < 10 || d100 >= 20)) return few;
+            return many;
+        }
+
+        function applyExpenseSyncStatus(text, color, dot) {
+            expenseSyncStatusLines.forEach((line) => {
+                line.textContent = text;
+                line.style.color = color;
+                line.style.opacity = '1';
             });
+            expenseSyncStatusDots.forEach((d) => { d.style.background = dot || color; });
+        }
+
+        function setExpenseSyncPersistent(text, color, dot) {
+            expenseSyncPersistent = { text: text, color: color, dot: dot || color };
+            if (!expenseSyncFlashTimer) applyExpenseSyncStatus(text, color, dot || color);
+        }
+
+        // Транзиентное сообщение: показать и через 4с плавно вернуть постоянный статус.
+        function flashExpenseSyncStatus(text, color) {
+            if (expenseSyncFlashTimer) clearTimeout(expenseSyncFlashTimer);
+            applyExpenseSyncStatus(text, color, color);
+            expenseSyncFlashTimer = setTimeout(() => {
+                expenseSyncFlashTimer = null;
+                expenseSyncStatusLines.forEach((line) => { line.style.opacity = '0'; });
+                setTimeout(() => {
+                    const p = expenseSyncPersistent;
+                    applyExpenseSyncStatus(p.text, p.color, p.dot);
+                }, 250);
+            }, 4000);
         }
 
         function renderExpenseSyncStatus(data) {
             const initialized = Boolean(data && data.initialized);
-
-            expenseSyncStatusLines.forEach((line) => {
-                if (initialized) {
-                    line.textContent =
-                        'Справочник создан. Синхронизировано статей: ' + (data.mappings_count || 0) + '.';
-                    line.style.color = '#059669';
-                } else {
-                    line.textContent = 'Справочник ещё не создан. Нажмите «Инициализировать справочник».';
-                    line.style.color = '#6b7280';
-                }
-            });
 
             expenseSyncToggles.forEach((cb) => {
                 cb.disabled = !initialized;
@@ -737,6 +760,128 @@
             expenseSyncInitBtns.forEach((btn) => {
                 btn.textContent = initialized ? 'Обновить справочник' : 'Инициализировать справочник';
             });
+
+            if (initialized) {
+                // Постоянный статус (синхронизировано / N расхождений) выставит diff.
+                loadExpenseSyncDiff();
+            } else {
+                clearExpenseSyncDiff();
+                if (data && data.message) {
+                    // Диагностика после переустановки (зеркало/доп. поле удалены вне приложения).
+                    setExpenseSyncPersistent(data.message, '#d97706', '#d97706');
+                } else {
+                    setExpenseSyncPersistent('Справочник ещё не создан', '#6b7280', '#9ca3af');
+                }
+            }
+        }
+
+        function clearExpenseSyncDiff() {
+            expenseSyncDiffBoxes.forEach((box) => {
+                box.textContent = '';
+            });
+        }
+
+        // Одна строка git-стиля: маркер + имя + приглушённая аннотация.
+        // Без innerHTML — имена приходят из МС.
+        function buildDiffRow(type, marker, name, annotation, title) {
+            const row = document.createElement('div');
+            row.className = 'expense-diff__row expense-diff__row--' + type;
+            if (title) row.title = title;
+
+            const m = document.createElement('span');
+            m.className = 'expense-diff__m';
+            m.textContent = marker;
+
+            const n = document.createElement('span');
+            n.className = 'expense-diff__n';
+            n.textContent = name;
+
+            const a = document.createElement('span');
+            a.className = 'expense-diff__a';
+            a.textContent = annotation;
+
+            row.appendChild(m);
+            row.appendChild(n);
+            row.appendChild(a);
+            return row;
+        }
+
+        function renderExpenseSyncDiff(data) {
+            const ok = Boolean(data && data.status === 'ok');
+            const inSync = ok && Boolean(data.in_sync);
+
+            // Строка статуса = краткая сводка.
+            if (!ok) {
+                setExpenseSyncPersistent('Не удалось получить состояние справочника', '#ef4444', '#ef4444');
+            } else if (inSync) {
+                const n = data.source_count || 0;
+                setExpenseSyncPersistent(
+                    'Синхронизировано · ' + n + ' ' + expenseSyncPlural(n, 'статья', 'статьи', 'статей'),
+                    '#059669', '#16a34a'
+                );
+            } else {
+                const total =
+                    (data.missing_in_mirror || []).length +
+                    (data.changed || []).length +
+                    (data.orphan_in_mirror || []).length +
+                    (data.duplicate_in_mirror || []).length +
+                    (data.extra_in_mirror || []).length;
+                setExpenseSyncPersistent(
+                    'Рассинхронизация · ' + total + ' ' +
+                    expenseSyncPlural(total, 'расхождение', 'расхождения', 'расхождений'),
+                    '#d97706', '#d97706'
+                );
+            }
+
+            expenseSyncDiffBoxes.forEach((box) => {
+                box.textContent = '';
+                if (!ok || inSync) return;
+
+                const body = document.createElement('div');
+                body.className = 'expense-diff__body';
+
+                (data.missing_in_mirror || []).forEach((e) =>
+                    body.appendChild(buildDiffRow('add', '+',
+                        e.source_name || e.expenseitem_id || '', 'нет в зеркале',
+                        'Статья есть в «Статьях расходов», но в зеркале её нет — зеркало отстаёт.\n«Обновить» создаст элемент в зеркале.')));
+
+                (data.changed || []).forEach((e) =>
+                    body.appendChild(buildDiffRow('mod', '~',
+                        e.source_name || e.mirror_name || '',
+                        'изменено: ' + (e.changed_fields || []).join(', '),
+                        'Поля статьи и её элемента в зеркале различаются.\n«Обновить» приведёт зеркало к значениям из «Статей расходов».')));
+
+                (data.orphan_in_mirror || []).forEach((e) =>
+                    body.appendChild(buildDiffRow('del', '−',
+                        e.mirror_name || e.element_id || '', 'статья удалена',
+                        'Элемент есть в зеркале, но соответствующая статья в «Статьях расходов» отсутствует — зеркало опережает.\n«Обновить» воссоздаст статью из элемента.')));
+
+                (data.duplicate_in_mirror || []).forEach((e) =>
+                    body.appendChild(buildDiffRow('del', '≡',
+                        e.mirror_name || e.element_id || '',
+                        'дубликат · «' + (e.source_name || '') + '»',
+                        'Несколько элементов зеркала ссылаются на одну статью «' + (e.source_name || '') + '» — лишняя копия в зеркале.\nУдаляется вручную.')));
+
+                (data.extra_in_mirror || []).forEach((e) =>
+                    body.appendChild(buildDiffRow('info', '?',
+                        e.mirror_name || e.element_id || '', 'без связи со статьёй',
+                        'Элемент добавлен в зеркало вручную и не связан ни с одной статьёй — зеркало опережает.\n«Обновить» создаст для него статью в «Статьях расходов».')));
+
+                box.appendChild(body);
+            });
+        }
+
+        function loadExpenseSyncDiff() {
+            if (!expenseSyncDiffBoxes.length) return;
+
+            fetch(buildApiUrl('/api/expense-sync/diff'), { headers: buildHeaders() })
+                .then((response) => response.json())
+                .then(renderExpenseSyncDiff)
+                .catch((error) => {
+                    console.error('Ошибка загрузки различий справочников:', error);
+                    clearExpenseSyncDiff();
+                    setExpenseSyncPersistent('Справочник создан · состояние недоступно', '#6b7280', '#9ca3af');
+                });
         }
 
         function loadExpenseSyncStatus() {
@@ -747,10 +892,7 @@
                 .then(renderExpenseSyncStatus)
                 .catch((error) => {
                     console.error('Ошибка загрузки статуса синхронизации статей:', error);
-                    expenseSyncStatusLines.forEach((line) => {
-                        line.textContent = 'Не удалось загрузить статус.';
-                        line.style.color = '#ef4444';
-                    });
+                    setExpenseSyncPersistent('Не удалось загрузить статус', '#ef4444', '#ef4444');
                 });
         }
 
@@ -759,7 +901,7 @@
 
             expenseSyncBusy = true;
             expenseSyncInitBtns.forEach((b) => (b.disabled = true));
-            setExpenseSyncFeedback('Инициализация...', '#6b7280');
+            flashExpenseSyncStatus('Обновление справочника…', '#6b7280');
 
             fetch(buildApiUrl('/api/expense-sync/init'), {
                 method: 'POST',
@@ -767,22 +909,16 @@
             })
                 .then((response) => response.json())
                 .then((data) => {
-                    const created = data.elements_created || 0;
-                    const skipped = data.elements_skipped || 0;
-                    let message = 'Готово. Создано элементов: ' + created + ', пропущено: ' + skipped + '.';
-                    let color = '#059669';
-
                     if (data.errors && data.errors.length) {
-                        message += ' Предупреждения: ' + data.errors.join('; ');
-                        color = '#d97706';
+                        flashExpenseSyncStatus('Готово с предупреждениями: ' + data.errors.join('; '), '#d97706');
+                    } else {
+                        flashExpenseSyncStatus('Готово', '#059669');
                     }
-
-                    setExpenseSyncFeedback(message, color);
                     loadExpenseSyncStatus();
                 })
                 .catch((error) => {
                     console.error('Ошибка инициализации справочника статей:', error);
-                    setExpenseSyncFeedback('Ошибка инициализации.', '#ef4444');
+                    flashExpenseSyncStatus('Ошибка инициализации', '#ef4444');
                 })
                 .finally(() => {
                     expenseSyncBusy = false;
@@ -805,8 +941,8 @@
                         alert(data.message || 'Не удалось включить');
                     } else {
                         expenseSyncToggles.forEach((cb) => (cb.checked = enabled));
-                        setExpenseSyncFeedback(
-                            enabled ? 'Автопроставление включено.' : 'Автопроставление выключено.',
+                        flashExpenseSyncStatus(
+                            enabled ? 'Автопроставление включено' : 'Автопроставление выключено',
                             '#059669'
                         );
                     }

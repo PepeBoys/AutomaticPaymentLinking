@@ -4,7 +4,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.cors import CORSMiddleware
@@ -36,6 +38,8 @@ from src.core.logging_config import setup_logging
 Path("logs").mkdir(exist_ok=True)
 
 setup_logging()
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -78,6 +82,34 @@ if settings.api_rate_limit > 0:
             return PlainTextResponse("Rate limit exceeded", status_code=429)
 
         return await call_next(request)
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+):
+    """Логирует тело отклонённого запроса (диагностика 422 от вебхуков МС).
+
+    Для вебхуков МойСклад пишем сырое тело, чтобы видеть, какое поле не прошло
+    валидацию (МС повторяет такие доставки — без тела причину не установить).
+    Ответ остаётся стандартным 422, поведение эндпоинтов не меняется.
+    """
+    path = request.url.path
+    if "/hooks/" in path:
+        body = await request.body()
+        logger.warning(
+            "422 на %s %s: errors=%s; raw_body=%s",
+            request.method,
+            path,
+            exc.errors(),
+            body.decode("utf-8", errors="replace"),
+        )
+    else:
+        logger.warning("422 на %s %s: errors=%s", request.method, path, exc.errors())
+
+    return JSONResponse(
+        status_code=422, content={"detail": jsonable_encoder(exc.errors())}
+    )
+
 
 for exc_class, handler in HOOKS_EXCEPTION_HANDLERS.items():
     app.add_exception_handler(exc_class, handler)

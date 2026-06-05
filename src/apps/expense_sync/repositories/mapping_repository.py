@@ -3,7 +3,7 @@
 import logging
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..domain.entities import ExpenseItemMappingEntity
@@ -91,6 +91,15 @@ class ExpenseItemMappingRepository:
         await self._session.delete(model)
         await self._session.flush()
         return True
+
+    async def delete_all_by_account(self, account_id: str) -> int:
+        """Удалить все соответствия аккаунта. Возвращает число удалённых строк."""
+        stmt = delete(ExpenseItemMapping).where(
+            ExpenseItemMapping.ms_account_id == account_id
+        )
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.rowcount or 0
 
     @staticmethod
     def _to_entity(model: ExpenseItemMapping) -> ExpenseItemMappingEntity:

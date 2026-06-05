@@ -48,6 +48,11 @@ class CounterpartyService:
                 return attr
         return None
 
+    async def attribute_exists(self, attribute_id: str) -> bool:
+        """Существует ли доп. поле контрагента с данным id."""
+        attributes = await self._client.list_attributes()
+        return any(attr.get("id") == attribute_id for attr in attributes)
+
     @staticmethod
     def _extract_customentity_id(href: str) -> Optional[str]:
         """Извлечь id справочника из customEntityMeta.href.

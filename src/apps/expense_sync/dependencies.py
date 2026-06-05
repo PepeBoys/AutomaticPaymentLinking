@@ -54,8 +54,17 @@ ExpenseSetupSvcDep = Annotated[
 async def get_expense_sync_service(
     auth_service: MySkladAuthService = Depends(get_ms_auth_service),
     uow: ExpenseSyncUnitOfWork = Depends(get_expense_sync_uow),
+    customentity_service: CustomEntityService = Depends(get_customentity_service),
+    counterparty_service: CounterpartyService = Depends(get_counterparty_service),
+    expenseitem_service: ExpenseItemService = Depends(get_expenseitem_service),
 ) -> ExpenseSyncService:
-    return ExpenseSyncService(auth_service=auth_service, uow=uow)
+    return ExpenseSyncService(
+        auth_service=auth_service,
+        uow=uow,
+        customentity_service=customentity_service,
+        counterparty_service=counterparty_service,
+        expenseitem_service=expenseitem_service,
+    )
 
 
 ExpenseSyncSvcDep = Annotated[ExpenseSyncService, Depends(get_expense_sync_service)]

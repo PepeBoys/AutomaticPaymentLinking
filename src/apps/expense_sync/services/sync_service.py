@@ -20,7 +20,7 @@ from ...counterparty.exceptions import CounterpartyNotFoundError
 from ...counterparty.services.counterparty_service import CounterpartyService
 from ...customentity.exceptions import CustomEntityNotFoundError
 from ...customentity.services.customentity_service import CustomEntityService
-from ...expenseitem.exceptions import ExpenseItemNotFoundError
+from ...expenseitem.exceptions import ExpenseItemAPIError, ExpenseItemNotFoundError
 from ...expenseitem.services.expenseitem_service import ExpenseItemService
 from ...ms_auth.services.auth_service import MySkladAuthService
 from ..uow.unit_of_work import ExpenseSyncUnitOfWork
@@ -257,7 +257,23 @@ class ExpenseSyncHandler:
         await self._uow.mappings.delete_by_element(account_id, element_id)
         await self._uow.commit()
 
-        await self._expenseitem_service.delete(expenseitem_id)
+        try:
+            await self._expenseitem_service.delete(expenseitem_id)
+        except ExpenseItemAPIError as exc:
+            # Статья расходов может быть защищённой (одна из пяти системных в МС) —
+            # МС отклоняет её удаление. Это ожидаемый, не фатальный случай:
+            # короткий лог без трейсбека, вебхук не роняем. Статья останется
+            # «осиротевшей» (элемент-зеркало удалён) — это покажет diff
+            # справочников, а переинициализация пересоздаст элемент.
+            logger.warning(
+                "Не удалось удалить статью расходов %s (возможно, защищённая системная "
+                "статья) при удалении элемента-зеркала %s: %s",
+                expenseitem_id,
+                element_id,
+                exc,
+            )
+            return
+
         logger.info(
             "Удалена статья расходов %s (элемент-зеркало %s удалён)",
             expenseitem_id,

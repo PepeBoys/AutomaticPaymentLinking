@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from .dependencies import ExpenseSetupSvcDep, ExpenseSyncSvcDep
 from .schemas import (
+    ExpenseSyncDiffResponse,
     ExpenseSyncInitResponse,
     ExpenseSyncStatusResponse,
     ExpenseSyncTogglePayload,
@@ -20,6 +21,13 @@ router = APIRouter()
 async def get_status(service: ExpenseSyncSvcDep):
     status = await service.get_status()
     return ExpenseSyncStatusResponse(**status)
+
+
+@router.get("/diff", response_model=ExpenseSyncDiffResponse)
+async def get_diff(service: ExpenseSyncSvcDep):
+    """Рассинхронизация зеркала со справочником «Статьи расходов»."""
+    diff = await service.compute_diff()
+    return ExpenseSyncDiffResponse(**diff)
 
 
 @router.post("/init", response_model=ExpenseSyncInitResponse)

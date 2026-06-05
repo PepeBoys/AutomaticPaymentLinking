@@ -158,23 +158,82 @@ class ExpenseItemSetupService:
         # 4. Вебхуки синхронизации
         await self._register_sync_webhooks(result)
 
+        # 5. Автопроставление включаем по умолчанию после успешной
+        # инициализации/обновления справочника (справочник + доп. поле на месте).
+        if mirror_id and attribute_id:
+            await self._uow.configs.upsert(account_id, enabled=True)
+            await self._uow.commit()
+
         return result
+
+    @staticmethod
+    def _element_content_diff(item, element) -> dict:
+        """Поля статьи, которые нужно записать в элемент зеркала (Статья → зеркало).
+
+        None в источнике трактуем как «не синхронизировать это поле» —
+        симметрично логике вебхуков, чтобы не плодить пустые PUT и эхо-петли.
+        """
+        diff: dict = {}
+        for key, src, dst in (
+            ("name", item.name, element.name),
+            ("description", item.description, element.description),
+            ("code", item.code, element.code),
+        ):
+            if src is None:
+                continue
+            if dst != src:
+                diff[key] = src
+        return diff
 
     async def _backfill_elements(
         self, account_id: str, mirror_id: str
     ) -> tuple[int, int]:
-        """Создать недостающие элементы справочника по текущим статьям расходов."""
+        """Заполнить справочник-зеркало по текущим статьям расходов.
+
+        Источник истины — фактическое содержимое справочника в МС (а не
+        локальные маппинги): так на повторной инициализации/обновлении
+        восстанавливаются элементы, удалённые в МС вручную (в т.ч. пока
+        приложение было снято), и чинятся «осиротевшие» маппинги.
+        """
         expense_items = await self._expenseitem_service.list_all()
+        existing_elements = await self._customentity_service.list_elements(mirror_id)
+        # external_code элемента = id статьи расходов (кросс-ссылка на стороне зеркала).
+        element_by_item_id = {
+            el.external_code: el for el in existing_elements if el.external_code
+        }
         existing_mappings = await self._uow.mappings.list_by_account(account_id)
-        mapped_ids = {m.expenseitem_id for m in existing_mappings}
+        mapping_by_item_id = {m.expenseitem_id: m for m in existing_mappings}
 
         created = 0
         skipped = 0
+        updated = 0
 
         for item in expense_items:
-            if item.id in mapped_ids:
+            element = element_by_item_id.get(item.id)
+
+            if element is not None:
+                # Элемент в справочнике есть — приводим маппинг в соответствие.
+                mapping = mapping_by_item_id.get(item.id)
+                if mapping is None:
+                    await self._uow.mappings.add(account_id, item.id, element.id)
+                elif mapping.customentity_element_id != element.id:
+                    await self._uow.mappings.delete_by_expenseitem(account_id, item.id)
+                    await self._uow.mappings.add(account_id, item.id, element.id)
+                # Содержимое пары разошлось — подтягиваем элемент к статье
+                # (Статья расходов — источник истины для существующих пар).
+                content = self._element_content_diff(item, element)
+                if content:
+                    await self._customentity_service.update_element(
+                        mirror_id, element.id, **content
+                    )
+                    updated += 1
                 skipped += 1
                 continue
+
+            # Элемента в справочнике нет — снимаем устаревший маппинг (если есть)
+            # и создаём элемент заново.
+            if item.id in mapping_by_item_id:
+                await self._uow.mappings.delete_by_expenseitem(account_id, item.id)
 
             element = await self._customentity_service.create_element(
                 metadata_id=mirror_id,
@@ -187,11 +246,41 @@ class ExpenseItemSetupService:
             await self._uow.mappings.add(account_id, item.id, element.id)
             created += 1
 
+        # Обратный проход: элементы зеркала без живой статьи (external_code
+        # устарел или отсутствует) — зеркало «опережает». Восстанавливаем статью
+        # из элемента, чиним кросс-ссылку и локальное соответствие. Симметрично
+        # живой синхронизации customentity→expenseitem.
+        item_ids = {item.id for item in expense_items}
+        restored = 0
+        for element in existing_elements:
+            if element.external_code and element.external_code in item_ids:
+                continue  # сопоставлен с существующей статьёй — обработан выше
+
+            new_item = await self._expenseitem_service.create(
+                name=element.name,
+                description=element.description,
+                code=element.code,
+            )
+            # Восстанавливаем кросс-ссылку на стороне зеркала и соответствие.
+            await self._customentity_service.update_element(
+                mirror_id, element.id, external_code=new_item.id
+            )
+            await self._uow.mappings.delete_by_element(account_id, element.id)
+            await self._uow.mappings.add(account_id, new_item.id, element.id)
+            # Коммитим сразу: создание статьи уже отправило вебхук expenseitem
+            # CREATE — соответствие должно быть в БД до его обработки, иначе
+            # эхо-обработчик создаст дублирующий элемент зеркала.
+            await self._uow.commit()
+            restored += 1
+
         logger.info(
-            "Бэкафилл статей расходов: account_id=%s, создано=%d, пропущено=%d",
+            "Бэкафилл статей расходов: account_id=%s, создано=%d, пропущено=%d, "
+            "обновлено=%d, восстановлено статей из зеркала=%d",
             account_id,
             created,
             skipped,
+            updated,
+            restored,
         )
         return created, skipped
 

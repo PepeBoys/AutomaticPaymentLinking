@@ -70,6 +70,37 @@ class ExpenseSyncConfigRepository:
         await self._session.refresh(model)
         return self._to_entity(model)
 
+    async def clear_counterparty_attribute(self, account_id: str) -> bool:
+        """Сбросить ссылку на доп. поле и выключить фичу.
+
+        Используется, когда справочник цел, но доп. поле контрагента удалено в
+        МС: повторная инициализация пересоздаст поле на существующем справочнике.
+        """
+        stmt = select(ExpenseItemSyncConfig).where(
+            ExpenseItemSyncConfig.ms_account_id == account_id
+        )
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        if not model:
+            return False
+        model.counterparty_attribute_id = None
+        model.enabled = False
+        await self._session.flush()
+        return True
+
+    async def delete_by_account_id(self, account_id: str) -> bool:
+        """Удалить настройки аккаунта. False, если записи не было."""
+        stmt = select(ExpenseItemSyncConfig).where(
+            ExpenseItemSyncConfig.ms_account_id == account_id
+        )
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        if not model:
+            return False
+        await self._session.delete(model)
+        await self._session.flush()
+        return True
+
     @staticmethod
     def _to_entity(model: ExpenseItemSyncConfig) -> ExpenseSyncConfig:
         return ExpenseSyncConfig(
