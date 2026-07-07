@@ -1,4 +1,5 @@
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
@@ -201,6 +202,9 @@ async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDe
 
 @router.post("/moysklad/webhook", status_code=204)
 async def receive_moysklad_webhook(
+    # Должна выполниться первой: кладёт accountId из payload в request.state
+    # до того, как сервисы ниже разрешат get_ms_auth_service.
+    _: Annotated[None, Depends(set_request_account_from_webhook)],
     payload: MySkladWebhookPayload,
     service: WebhookSvcDep,
     paymentin_service: PaymentInSvcDep,
@@ -215,7 +219,6 @@ async def receive_moysklad_webhook(
     supply_service: SupplySvcDep,
     expense_sync_handler: ExpenseSyncHandlerDep,
     request_id: RequestIdQuery = None,
-    _: None = Depends(set_request_account_from_webhook),
 ) -> Response:
     logger.info(
         "Получен вебхук МойСклад: requestId=%s, events=%d, uid=%s, moment=%s",
