@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..domain.entities import WebhookEntity
 from ..exceptions import RepositoryError
 from ..models import WebhookSubscription
+from ..purpose_templates import masks_from_db, masks_to_db
 from ..schemas import DocumentPriority, DocumentType, LinkType, PaymentType
 from .base import AbstractRepository
 
@@ -149,7 +150,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         document_type: DocumentType,
         link_type: LinkType,
         document_priority: DocumentPriority,
-        payment_purpose_mask: str | None,
+        payment_purpose_masks: list[str],
         payment_status_on_success: str | None,
         payment_status_on_failure: str | None,
         document_status_on_success: str | None,
@@ -188,7 +189,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
         model.document_type = document_type
         model.link_type = link_type
         model.document_priority = document_priority
-        model.payment_purpose_mask = payment_purpose_mask
+        model.payment_purpose_mask = masks_to_db(payment_purpose_masks)
         model.payment_status_on_success = payment_status_on_success
         model.payment_status_on_failure = payment_status_on_failure
         model.document_status_on_success = document_status_on_success
@@ -251,7 +252,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "document_type": model.document_type.value,
                     "link_type": model.link_type.value,
                     "document_priority": model.document_priority.value,
-                    "payment_purpose_mask": model.payment_purpose_mask,
+                    "payment_purpose_mask": masks_from_db(model.payment_purpose_mask),
                     "payment_status_on_success": model.payment_status_on_success,
                     "payment_status_on_failure": model.payment_status_on_failure,
                     "document_status_on_success": model.document_status_on_success,
@@ -265,7 +266,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
                     "document_type": DocumentType.customerorder.value,
                     "link_type": LinkType.sum_and_counterparty.value,
                     "document_priority": DocumentPriority.oldest_first.value,
-                    "payment_purpose_mask": None,
+                    "payment_purpose_mask": [],
                     "payment_status_on_success": None,
                     "payment_status_on_failure": None,
                     "document_status_on_success": None,
@@ -379,7 +380,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             model.document_type = entity.document_type
             model.link_type = entity.link_type
             model.document_priority = entity.document_priority
-            model.payment_purpose_mask = entity.payment_purpose_mask
+            model.payment_purpose_mask = masks_to_db(entity.payment_purpose_masks)
             model.payment_status_on_success = entity.payment_status_on_success
             model.payment_status_on_failure = entity.payment_status_on_failure
             model.document_status_on_success = entity.document_status_on_success
@@ -519,7 +520,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             document_type=model.document_type,
             link_type=model.link_type,
             document_priority=model.document_priority,
-            payment_purpose_mask=model.payment_purpose_mask,
+            payment_purpose_masks=masks_from_db(model.payment_purpose_mask),
             payment_status_on_success=model.payment_status_on_success,
             payment_status_on_failure=model.payment_status_on_failure,
             document_status_on_success=model.document_status_on_success,
@@ -554,7 +555,7 @@ class WebhookRepository(AbstractRepository[WebhookEntity]):
             document_type=entity.document_type,
             link_type=entity.link_type,
             document_priority=entity.document_priority,
-            payment_purpose_mask=entity.payment_purpose_mask,
+            payment_purpose_mask=masks_to_db(entity.payment_purpose_masks),
             payment_status_on_success=entity.payment_status_on_success,
             payment_status_on_failure=entity.payment_status_on_failure,
             document_status_on_success=entity.document_status_on_success,

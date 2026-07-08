@@ -21,7 +21,7 @@ class WebhookEntity:
     document_type: DocumentType = DocumentType.customerorder
     link_type: LinkType = LinkType.sum_and_counterparty
     document_priority: DocumentPriority = DocumentPriority.oldest_first
-    payment_purpose_mask: Optional[str] = None
+    payment_purpose_masks: list[str] = field(default_factory=list)
     payment_status_on_success: Optional[str] = None
     payment_status_on_failure: Optional[str] = None
     document_status_on_success: Optional[str] = None

@@ -1,6 +1,6 @@
 from sqlalchemy import Boolean, CheckConstraint, Column
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import Index, String
+from sqlalchemy import Index, String, Text
 
 from src.core.models import Base
 
@@ -46,8 +46,11 @@ class WebhookSubscription(Base):
         server_default="oldest_first",
     )
 
+    # JSON-массив шаблонов назначения платежа (до 10 строк по 256 символов).
+    # Кодек — masks_from_db/masks_to_db в purpose_templates.py; legacy-строки
+    # (не-JSON) читаются как список из одного шаблона.
     payment_purpose_mask = Column(
-        String(512),
+        Text,
         nullable=True,
     )
 

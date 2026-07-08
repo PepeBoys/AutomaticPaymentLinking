@@ -19,12 +19,16 @@ from .dependencies import (
     WebhookSvcDep,
     set_request_account_from_webhook,
 )
+from .purpose_templates import test_templates
 from .schemas import (
     AutoLinkTogglePayload,
     DocumentType,
     MySkladWebhookPayload,
     PaymentType,
+    PurposeTemplateTestResult,
     StatesResponse,
+    TestPurposeTemplatePayload,
+    TestPurposeTemplateResponse,
     UpdateLinkSettingsPayload,
     WebhookStatusResponse,
 )
@@ -137,7 +141,7 @@ async def update_link_settings(
         document_type=payload.document_type,
         link_type=payload.link_type,
         document_priority=payload.document_priority,
-        payment_purpose_mask=payload.payment_purpose_mask,
+        payment_purpose_masks=payload.payment_purpose_mask,
         payment_status_on_success=payload.payment_status_on_success,
         payment_status_on_failure=payload.payment_status_on_failure,
         document_status_on_success=payload.document_status_on_success,
@@ -147,6 +151,22 @@ async def update_link_settings(
     )
 
     return result
+
+
+@router.post("/test-purpose-template", response_model=TestPurposeTemplateResponse)
+async def test_purpose_template(payload: TestPurposeTemplatePayload):
+    """Прогнать пример назначения платежа по шаблонам без сохранения настроек."""
+    results = test_templates(payload.payment_purpose, payload.templates)
+
+    matched_index = next(
+        (index for index, result in enumerate(results) if result["matched"]),
+        None,
+    )
+
+    return TestPurposeTemplateResponse(
+        results=[PurposeTemplateTestResult(**result) for result in results],
+        matched_index=matched_index,
+    )
 
 
 @router.post("/auto-link-toggle")
@@ -173,7 +193,7 @@ async def auto_link_toggle(payload: AutoLinkTogglePayload, service: WebhookSvcDe
         document_type=payload.document_type,
         link_type=payload.link_type,
         document_priority=payload.document_priority,
-        payment_purpose_mask=payload.payment_purpose_mask,
+        payment_purpose_masks=payload.payment_purpose_mask,
         payment_status_on_success=payload.payment_status_on_success,
         payment_status_on_failure=payload.payment_status_on_failure,
         document_status_on_success=payload.document_status_on_success,

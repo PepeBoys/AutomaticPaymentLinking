@@ -110,19 +110,56 @@
             style="display: none; margin-top: 12px; padding: 12px; background: #f9fafb; border-radius: 4px;"
         >
             <label class="caption" style="display: block; margin-bottom: 6px; font-weight: 500;">
-                Шаблон назначения платежа
+                Шаблоны назначения платежа
+                <span class="help-tip" tabindex="0">
+                    <span class="help-icon" aria-hidden="true">?</span>
+                    <span class="help-tooltip">Шаблоны применяются по порядку сверху вниз, срабатывает первый совпавший. Если не совпал ни один — платёж не привязывается.</span>
+                </span>
             </label>
-            <input
-                class="ui-input js-payment-purpose-mask"
-                type="text"
-                name="payment_purpose_mask_{{ payment_type }}"
+
+            <div class="js-mask-list" data-payment-type="{{ payment_type }}"></div>
+
+            <button
+                type="button"
+                class="ui-button js-add-mask"
                 data-payment-type="{{ payment_type }}"
-                placeholder="Оплата по $name от $moment"
-                style="width: 100%; font-size: 13px;"
+                style="margin-top: 8px; font-size: 12px; padding: 4px 10px;"
             >
-            <div class="caption" style="margin-top: 6px; font-size: 11px; color: #9ca3af;">
-                Переменные: <code style="background: #e5e7eb; padding: 2px 4px; border-radius: 2px;">$name</code> — номер документа, 
-                <code style="background: #e5e7eb; padding: 2px 4px; border-radius: 2px;">$moment</code> — дата (ДД.ММ.ГГГГ)
+                + Добавить шаблон
+            </button>
+
+            <div class="caption" style="margin-top: 8px; font-size: 11px; color: #9ca3af;">
+                Переменные: <code style="background: #e5e7eb; padding: 2px 4px; border-radius: 2px;">$name</code> — номер документа (обязательна),
+                <code style="background: #e5e7eb; padding: 2px 4px; border-radius: 2px;">$moment</code> — дата ДД.ММ.ГГГГ (опциональна;
+                если указана в шаблоне, дата обязана присутствовать в назначении платежа). Максимум 10 шаблонов.
+            </div>
+
+            <div class="mask-tester" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e5e7eb;">
+                <label class="caption" style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 500;">
+                    Проверка шаблонов
+                    <span class="help-tip" tabindex="0">
+                        <span class="help-icon" aria-hidden="true">?</span>
+                        <span class="help-tooltip">Вставьте реальное назначение платежа и посмотрите, какой шаблон совпадёт и что из него извлечётся.</span>
+                    </span>
+                </label>
+                <div style="display: flex; gap: 8px;">
+                    <input
+                        class="ui-input js-mask-test-input"
+                        type="text"
+                        data-payment-type="{{ payment_type }}"
+                        placeholder="Например: Оплата по счету 123 от 01.02.2026"
+                        style="flex: 1; font-size: 13px;"
+                    >
+                    <button
+                        type="button"
+                        class="ui-button js-mask-test-run"
+                        data-payment-type="{{ payment_type }}"
+                        style="font-size: 12px; padding: 4px 12px;"
+                    >
+                        Проверить
+                    </button>
+                </div>
+                <div class="js-mask-test-result" data-payment-type="{{ payment_type }}" style="margin-top: 8px;"></div>
             </div>
         </div>
     </div>

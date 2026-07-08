@@ -261,6 +261,304 @@
             });
         }
 
+        // ===== Шаблоны назначения платежа =====
+        // Валидация зеркалит серверную (purpose_templates.validate_template):
+        // расхождение правил приведёт к 422 на сохранении.
+        const MASK_MAX_TEMPLATES = 10;
+        const MASK_MAX_LENGTH = 256;
+        const MASK_VAR_RE = /\$[A-Za-z_][A-Za-z0-9_]*/g;
+
+        function validateMaskTemplate(value) {
+            const errors = [];
+            const stripped = value.trim();
+
+            if (!stripped) {
+                return ['шаблон не может быть пустым'];
+            }
+            if (stripped.length > MASK_MAX_LENGTH) {
+                errors.push(`длина шаблона не должна превышать ${MASK_MAX_LENGTH} символов`);
+            }
+
+            const matches = Array.from(stripped.matchAll(MASK_VAR_RE));
+            const varNames = matches.map((m) => m[0].slice(1));
+
+            const unknown = [...new Set(varNames.filter((v) => v !== 'name' && v !== 'moment'))];
+            if (unknown.length) {
+                errors.push('неизвестные переменные: ' + unknown.map((v) => '$' + v).join(', '));
+            }
+
+            const nameCount = varNames.filter((v) => v === 'name').length;
+            if (nameCount === 0) {
+                errors.push('шаблон должен содержать переменную $name');
+            } else if (nameCount > 1) {
+                errors.push('переменная $name должна встречаться ровно один раз');
+            }
+
+            if (varNames.filter((v) => v === 'moment').length > 1) {
+                errors.push('переменная $moment может встречаться не более одного раза');
+            }
+
+            for (let i = 1; i < matches.length; i++) {
+                const prev = matches[i - 1];
+                const between = stripped.slice(prev.index + prev[0].length, matches[i].index);
+                if (!between.trim()) {
+                    errors.push('между переменными должен быть литеральный текст');
+                    break;
+                }
+            }
+
+            return errors;
+        }
+
+        function getMaskTemplates(paymentType) {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+            if (!tab) return [];
+            return Array.from(tab.querySelectorAll('.js-payment-purpose-mask'))
+                .map((input) => input.value.trim())
+                .filter(Boolean);
+        }
+
+        // Причина, по которой сохранение в режиме шаблонов невозможно (null — всё ок).
+        function maskConfigError(paymentType) {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+            if (!tab) return null;
+
+            const linkType = tab.querySelector('.js-link-type:checked')?.value;
+            if (linkType !== 'payment_purpose_mask') return null;
+
+            const templates = getMaskTemplates(paymentType);
+            if (!templates.length) return 'Добавьте хотя бы один шаблон';
+            if (templates.length > MASK_MAX_TEMPLATES) return `Не более ${MASK_MAX_TEMPLATES} шаблонов`;
+
+            const seen = new Set();
+            for (const template of templates) {
+                if (validateMaskTemplate(template).length) return 'Исправьте невалидные шаблоны';
+                const key = template.split(/\s+/).join(' ').toLowerCase();
+                if (seen.has(key)) return 'Уберите повторяющиеся шаблоны';
+                seen.add(key);
+            }
+            return null;
+        }
+
+        // Подсветка $name/$moment в тексте шаблона (без innerHTML).
+        function renderMaskPreview(container, value) {
+            container.textContent = '';
+            if (!value) return;
+
+            let last = 0;
+            for (const match of value.matchAll(MASK_VAR_RE)) {
+                if (match.index > last) {
+                    container.appendChild(document.createTextNode(value.slice(last, match.index)));
+                }
+
+                const token = match[0];
+                const span = document.createElement('span');
+                if (token === '$name') {
+                    span.className = 'mask-var mask-var--name';
+                    span.title = 'Сюда извлекается номер документа';
+                } else if (token === '$moment') {
+                    span.className = 'mask-var mask-var--moment';
+                    span.title = 'Сюда извлекается дата (ДД.ММ.ГГГГ)';
+                } else {
+                    span.className = 'mask-var mask-var--unknown';
+                    span.title = 'Неизвестная переменная';
+                }
+                span.textContent = token;
+                container.appendChild(span);
+
+                last = match.index + token.length;
+            }
+            if (last < value.length) {
+                container.appendChild(document.createTextNode(value.slice(last)));
+            }
+        }
+
+        function refreshMaskRow(row, paymentType) {
+            const input = row.querySelector('.js-payment-purpose-mask');
+            const preview = row.querySelector('.mask-row__preview');
+            const errorBox = row.querySelector('.mask-row__error');
+            const value = input.value.trim();
+
+            renderMaskPreview(preview, value);
+
+            const errors = value ? validateMaskTemplate(value) : [];
+            errorBox.textContent = errors.join('; ');
+            input.classList.toggle('mask-input--invalid', errors.length > 0);
+
+            refreshMaskControls(paymentType);
+        }
+
+        function createMaskRow(paymentType, value) {
+            const row = document.createElement('div');
+            row.className = 'mask-row';
+
+            const line = document.createElement('div');
+            line.className = 'mask-row__line';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'ui-input js-payment-purpose-mask';
+            input.dataset.paymentType = paymentType;
+            input.placeholder = 'Оплата по счету $name от $moment';
+            input.value = value || '';
+            input.addEventListener('input', () => refreshMaskRow(row, paymentType));
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'mask-row__remove js-mask-remove';
+            removeBtn.title = 'Удалить шаблон';
+            removeBtn.textContent = '×';
+            removeBtn.addEventListener('click', () => {
+                row.remove();
+                refreshMaskControls(paymentType);
+            });
+
+            line.appendChild(input);
+            line.appendChild(removeBtn);
+
+            const preview = document.createElement('div');
+            preview.className = 'mask-row__preview';
+
+            const errorBox = document.createElement('div');
+            errorBox.className = 'mask-row__error';
+
+            row.appendChild(line);
+            row.appendChild(preview);
+            row.appendChild(errorBox);
+            return row;
+        }
+
+        function setMaskTemplates(paymentType, masks) {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+            const list = tab ? tab.querySelector('.js-mask-list') : null;
+            if (!list) return;
+
+            const values = Array.isArray(masks) ? masks : (masks ? [masks] : []);
+            list.textContent = '';
+            (values.length ? values : ['']).forEach((value) => {
+                list.appendChild(createMaskRow(paymentType, value));
+            });
+            list.querySelectorAll('.mask-row').forEach((row) => refreshMaskRow(row, paymentType));
+        }
+
+        // Пересчитать доступность кнопок «Добавить» и «Сохранить» для вкладки.
+        function refreshMaskControls(paymentType) {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+            if (!tab) return;
+
+            const checkbox = tab.querySelector('.js-auto-link-toggle');
+            updateTabControlsState(paymentType, checkbox ? checkbox.checked : false);
+        }
+
+        function renderMaskTestMessage(box, text, color) {
+            box.textContent = '';
+            const line = document.createElement('div');
+            line.className = 'mask-test__message';
+            line.style.color = color || '#6b7280';
+            line.textContent = text;
+            box.appendChild(line);
+        }
+
+        function renderMaskTestResults(box, data) {
+            box.textContent = '';
+
+            data.results.forEach((result, index) => {
+                const row = document.createElement('div');
+                row.className = 'mask-test__row';
+
+                const icon = document.createElement('span');
+                icon.className = 'mask-test__icon';
+
+                const template = document.createElement('span');
+                template.className = 'mask-test__template';
+                template.textContent = result.template;
+
+                const outcome = document.createElement('span');
+                outcome.className = 'mask-test__outcome';
+
+                if (!result.valid) {
+                    icon.textContent = '⚠';
+                    icon.style.color = '#d97706';
+                    outcome.textContent = 'невалидный: ' + result.errors.join('; ');
+                    outcome.style.color = '#d97706';
+                } else if (result.matched) {
+                    icon.textContent = '✓';
+                    icon.style.color = '#059669';
+                    outcome.textContent = 'номер = ' + result.name + (result.moment ? ', дата = ' + result.moment : '');
+                    outcome.style.color = '#059669';
+                } else {
+                    icon.textContent = '✗';
+                    icon.style.color = '#9ca3af';
+                    outcome.textContent = 'не совпал';
+                    outcome.style.color = '#9ca3af';
+                }
+
+                if (index === data.matched_index) {
+                    row.classList.add('mask-test__row--winner');
+                    outcome.textContent += ' — сработает этот шаблон';
+                }
+
+                row.appendChild(icon);
+                row.appendChild(template);
+                row.appendChild(outcome);
+                box.appendChild(row);
+            });
+
+            if (data.matched_index === null || data.matched_index === undefined) {
+                const line = document.createElement('div');
+                line.className = 'mask-test__message';
+                line.style.color = '#ef4444';
+                line.textContent = 'Ни один шаблон не совпал — такой платёж не будет привязан.';
+                box.appendChild(line);
+            }
+        }
+
+        function runMaskTest(paymentType) {
+            const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+            if (!tab) return;
+
+            const input = tab.querySelector('.js-mask-test-input');
+            const box = tab.querySelector('.js-mask-test-result');
+            const purpose = input ? input.value.trim() : '';
+            const templates = getMaskTemplates(paymentType);
+
+            if (!purpose) {
+                renderMaskTestMessage(box, 'Вставьте текст назначения платежа', '#d97706');
+                return;
+            }
+            if (!templates.length) {
+                renderMaskTestMessage(box, 'Добавьте хотя бы один шаблон', '#d97706');
+                return;
+            }
+
+            renderMaskTestMessage(box, 'Проверяем...');
+
+            fetch(buildApiUrl('/api/hooks/test-purpose-template'), {
+                method: 'POST',
+                headers: buildHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ payment_purpose: purpose, templates: templates }),
+            })
+                .then((response) => response.json())
+                .then((data) => renderMaskTestResults(box, data))
+                .catch((error) => {
+                    console.error('Ошибка проверки шаблонов:', error);
+                    renderMaskTestMessage(box, 'Не удалось выполнить проверку', '#ef4444');
+                });
+        }
+
+        // Человекочитаемое сообщение из ответа FastAPI (422 и др.).
+        function extractApiError(data) {
+            if (!data) return 'Ошибка при сохранении настроек';
+            if (typeof data.detail === 'string') return data.detail;
+            if (Array.isArray(data.detail)) {
+                return data.detail
+                    .map((item) => (item.msg || '').replace(/^Value error,\s*/, ''))
+                    .filter(Boolean)
+                    .join('\n') || 'Ошибка валидации настроек';
+            }
+            return data.message || 'Ошибка при сохранении настроек';
+        }
+
         function updateTabControlsState(paymentType, enabled) {
             const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
             if (!tab) return;
@@ -268,7 +566,11 @@
             const documentRadios = tab.querySelectorAll('.js-document-type');
             const linkRadios = tab.querySelectorAll('.js-link-type');
             const priorityRadios = tab.querySelectorAll('.js-document-priority');
-            const maskInput = tab.querySelector('.js-payment-purpose-mask');
+            const maskInputs = tab.querySelectorAll('.js-payment-purpose-mask');
+            const maskRemoveButtons = tab.querySelectorAll('.js-mask-remove');
+            const addMaskButton = tab.querySelector('.js-add-mask');
+            const maskTestInput = tab.querySelector('.js-mask-test-input');
+            const maskTestButton = tab.querySelector('.js-mask-test-run');
             const statusSelects = tab.querySelectorAll('select');
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
             const transferSalesChannelCheckbox = tab.querySelector('.js-transfer-sales-channel');
@@ -280,12 +582,20 @@
             documentRadios.forEach(radio => radio.disabled = shouldDisable);
             linkRadios.forEach(radio => radio.disabled = shouldDisable);
             priorityRadios.forEach(radio => radio.disabled = shouldDisable);
-            if (maskInput) maskInput.disabled = shouldDisable;
+            maskInputs.forEach(input => input.disabled = shouldDisable);
+            maskRemoveButtons.forEach(button => button.disabled = shouldDisable);
+            if (addMaskButton) {
+                addMaskButton.disabled = shouldDisable || maskInputs.length >= MASK_MAX_TEMPLATES;
+            }
+            if (maskTestInput) maskTestInput.disabled = shouldDisable;
+            if (maskTestButton) maskTestButton.disabled = shouldDisable;
             statusSelects.forEach(select => select.disabled = shouldDisable);
             if (transferProjectCheckbox) transferProjectCheckbox.disabled = shouldDisable;
             if (transferSalesChannelCheckbox) transferSalesChannelCheckbox.disabled = shouldDisable;
             if (checkOrganizationCheckbox) checkOrganizationCheckbox.disabled = shouldDisable;
-            if (saveButton) saveButton.disabled = shouldDisable;
+            if (saveButton) {
+                saveButton.disabled = shouldDisable || Boolean(maskConfigError(paymentType));
+            }
         }
 
         function setTabControlsDisabled(paymentType, disabled) {
@@ -299,7 +609,9 @@
                 const documentRadios = tab.querySelectorAll('.js-document-type');
                 const linkRadios = tab.querySelectorAll('.js-link-type');
                 const priorityRadios = tab.querySelectorAll('.js-document-priority');
-                const maskInput = tab.querySelector('.js-payment-purpose-mask');
+                const maskInputs = tab.querySelectorAll('.js-payment-purpose-mask');
+                const maskButtons = tab.querySelectorAll('.js-mask-remove, .js-add-mask, .js-mask-test-run');
+                const maskTestInput = tab.querySelector('.js-mask-test-input');
                 const statusSelects = tab.querySelectorAll('select');
                 const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
                 const transferSalesChannelCheckbox = tab.querySelector('.js-transfer-sales-channel');
@@ -309,7 +621,9 @@
                 linkRadios.forEach(radio => radio.disabled = disabled);
                 priorityRadios.forEach(radio => radio.disabled = disabled);
                 if (checkbox) checkbox.disabled = disabled;
-                if (maskInput) maskInput.disabled = disabled;
+                maskInputs.forEach(input => input.disabled = disabled);
+                maskButtons.forEach(button => button.disabled = disabled);
+                if (maskTestInput) maskTestInput.disabled = disabled;
                 statusSelects.forEach(select => select.disabled = disabled);
                 if (transferProjectCheckbox) transferProjectCheckbox.disabled = disabled;
                 if (transferSalesChannelCheckbox) transferSalesChannelCheckbox.disabled = disabled;
@@ -341,7 +655,6 @@
             const defaultDocumentType = tab.querySelector('.js-document-type')?.value || 'customerorder';
             const linkTypeRadio = tab.querySelector('.js-link-type:checked');
             const documentPriorityRadio = tab.querySelector('.js-document-priority:checked');
-            const maskInput = tab.querySelector('.js-payment-purpose-mask');
             const paymentSuccessSelect = tab.querySelector('.js-payment-success-status');
             const paymentFailureSelect = tab.querySelector('.js-payment-failure-status');
             const documentSuccessSelect = tab.querySelector('.js-document-success-status');
@@ -353,7 +666,7 @@
                 document_type: documentTypeRadio ? documentTypeRadio.value : defaultDocumentType,
                 link_type: linkTypeRadio ? linkTypeRadio.value : 'sum_and_counterparty',
                 document_priority: documentPriorityRadio ? documentPriorityRadio.value : 'oldest_first',
-                payment_purpose_mask: maskInput ? maskInput.value.trim() : null,
+                payment_purpose_mask: getMaskTemplates(paymentType),
                 payment_status_on_success: paymentSuccessSelect ? paymentSuccessSelect.value || null : null,
                 payment_status_on_failure: paymentFailureSelect ? paymentFailureSelect.value || null : null,
                 document_status_on_success: documentSuccessSelect ? documentSuccessSelect.value || null : null,
@@ -376,9 +689,8 @@
             const priorityRadio = tab.querySelector(`.js-document-priority[value="${documentPriority || 'oldest_first'}"]`);
             if (priorityRadio) priorityRadio.checked = true;
 
-            const maskInput = tab.querySelector('.js-payment-purpose-mask');
-            if (maskInput && paymentPurposeMask !== undefined) {
-                maskInput.value = paymentPurposeMask || '';
+            if (paymentPurposeMask !== undefined) {
+                setMaskTemplates(paymentType, paymentPurposeMask);
             }
 
             const transferProjectCheckbox = tab.querySelector('.js-transfer-project');
@@ -575,9 +887,11 @@
                     check_document_organization: settings.check_document_organization,
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === "warning") {
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok) {
+                    alert(extractApiError(data));
+                } else if (data.status === "warning") {
                     alert(data.message);
                 } else if (data.status === "ok") {
                     webhookStatusCache[paymentType] = {
@@ -631,9 +945,12 @@
                     check_document_organization: settings.check_document_organization,
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === "warning") {
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok) {
+                    checkbox.checked = !enabled;
+                    alert(extractApiError(data));
+                } else if (data.status === "warning") {
                     checkbox.checked = !enabled;
                     alert(data.message || data.reason);
                 } else if (data.status === "ok") {
@@ -660,7 +977,26 @@
         initializeStatusSelects();
 
         ['incoming_payment', 'incoming_order', 'outgoing_payment', 'outgoing_order'].forEach((paymentType) => {
+            setMaskTemplates(paymentType, []);
             updateTabControlsState(paymentType, false);
+        });
+
+        document.querySelectorAll('.js-add-mask').forEach((button) => {
+            button.addEventListener('click', () => {
+                const paymentType = button.dataset.paymentType;
+                const tab = document.querySelector(`.js-tabs-item[data-payment-type="${paymentType}"]`);
+                const list = tab ? tab.querySelector('.js-mask-list') : null;
+                if (!list || list.querySelectorAll('.mask-row').length >= MASK_MAX_TEMPLATES) return;
+
+                const row = createMaskRow(paymentType, '');
+                list.appendChild(row);
+                refreshMaskRow(row, paymentType);
+                row.querySelector('input').focus();
+            });
+        });
+
+        document.querySelectorAll('.js-mask-test-run').forEach((button) => {
+            button.addEventListener('click', () => runMaskTest(button.dataset.paymentType));
         });
 
         checkboxes.forEach((checkbox) => {
@@ -673,6 +1009,11 @@
             const paymentType = radio.dataset.paymentType;
             radio.addEventListener("change", () => {
                 toggleMaskVisibility(paymentType);
+
+                if (radio.classList.contains('js-link-type')) {
+                    // Валидность кнопки «Сохранить» зависит от выбранного режима привязки.
+                    refreshMaskControls(paymentType);
+                }
 
                 if (radio.classList.contains('js-document-type') && ['incoming_payment', 'incoming_order', 'outgoing_payment', 'outgoing_order'].includes(paymentType)) {
                     loadStatuses(paymentType);
@@ -969,6 +1310,130 @@
 </script>
 
 <style>
+    /* ===== Шаблоны назначения платежа ===== */
+    .mask-row {
+        margin-bottom: 10px;
+    }
+
+    .mask-row__line {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .mask-row__line .js-payment-purpose-mask {
+        flex: 1;
+        font-size: 13px;
+    }
+
+    .mask-row__remove {
+        flex: 0 0 auto;
+        width: 26px;
+        height: 26px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        background: #fff;
+        color: #9ca3af;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+    }
+
+    .mask-row__remove:hover:not(:disabled) {
+        color: #ef4444;
+        border-color: #fca5a5;
+    }
+
+    .mask-row__remove:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .mask-input--invalid {
+        border-color: #ef4444 !important;
+    }
+
+    .mask-row__preview {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #6b7280;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+        min-height: 0;
+    }
+
+    .mask-row__preview:empty,
+    .mask-row__error:empty {
+        display: none;
+    }
+
+    .mask-var {
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-weight: 600;
+    }
+
+    .mask-var--name {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .mask-var--moment {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .mask-var--unknown {
+        background: #fee2e2;
+        color: #b91c1c;
+        text-decoration: line-through;
+    }
+
+    .mask-row__error {
+        margin-top: 3px;
+        font-size: 11px;
+        color: #ef4444;
+    }
+
+    .mask-test__row {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        padding: 4px 6px;
+        font-size: 12px;
+        border-radius: 4px;
+    }
+
+    .mask-test__row--winner {
+        background: #ecfdf5;
+    }
+
+    .mask-test__icon {
+        flex: 0 0 auto;
+        width: 14px;
+        text-align: center;
+    }
+
+    .mask-test__template {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        color: #374151;
+        word-break: break-word;
+    }
+
+    .mask-test__outcome {
+        margin-left: auto;
+        flex: 0 0 auto;
+        max-width: 55%;
+        text-align: right;
+    }
+
+    .mask-test__message {
+        font-size: 12px;
+        padding: 4px 0;
+    }
+
     .link-settings .radio__input:disabled + .radio__box {
         opacity: 0.6;
         cursor: not-allowed;

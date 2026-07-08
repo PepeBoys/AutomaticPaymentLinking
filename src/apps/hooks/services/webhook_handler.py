@@ -1,8 +1,6 @@
 """Обработчик webhook событий для автоматической привязки платежей."""
 
 import logging
-import re
-from datetime import datetime
 
 from ...cashin.exceptions import CashInNotFoundError
 from ...cashin.services.cashin_service import CashInService
@@ -25,6 +23,7 @@ from ...purchaseorder.services.purchaseorder_service import PurchaseOrderService
 from ...supply.exceptions import SupplyNotFoundError
 from ...supply.services.supply_service import SupplyService
 from ..domain.entities import WebhookEntity
+from ..purpose_templates import extract_from_templates
 from ..schemas import DocumentPriority, DocumentType, LinkType
 
 logger = logging.getLogger(__name__)
@@ -113,7 +112,7 @@ class WebhookHandler:
                     payment=payment,
                     document_type=subscription.document_type,
                     link_type=subscription.link_type,
-                    payment_purpose_mask=subscription.payment_purpose_mask,
+                    payment_purpose_masks=subscription.payment_purpose_masks,
                     organization_id=(
                         payment.organization_id
                         if subscription.check_document_organization
@@ -282,7 +281,7 @@ class WebhookHandler:
         payment,
         document_type: DocumentType,
         link_type: LinkType,
-        payment_purpose_mask: str | None = None,
+        payment_purpose_masks: list[str] | None = None,
         organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
@@ -292,7 +291,7 @@ class WebhookHandler:
             return await self._find_order_for_payment(
                 payment,
                 link_type,
-                payment_purpose_mask,
+                payment_purpose_masks,
                 organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -301,7 +300,7 @@ class WebhookHandler:
             return await self._find_invoice_for_payment(
                 payment,
                 link_type,
-                payment_purpose_mask,
+                payment_purpose_masks,
                 organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -310,7 +309,7 @@ class WebhookHandler:
             return await self._find_demand_for_payment(
                 payment,
                 link_type,
-                payment_purpose_mask,
+                payment_purpose_masks,
                 organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -319,7 +318,7 @@ class WebhookHandler:
             return await self._find_purchaseorder_for_payment(
                 payment,
                 link_type,
-                payment_purpose_mask,
+                payment_purpose_masks,
                 organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -328,7 +327,7 @@ class WebhookHandler:
             return await self._find_invoicein_for_payment(
                 payment,
                 link_type,
-                payment_purpose_mask,
+                payment_purpose_masks,
                 organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -337,7 +336,7 @@ class WebhookHandler:
             return await self._find_supply_for_payment(
                 payment,
                 link_type,
-                payment_purpose_mask,
+                payment_purpose_masks,
                 organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -588,7 +587,7 @@ class WebhookHandler:
         self,
         payment,
         link_type: LinkType,
-        payment_purpose_mask: str | None = None,
+        payment_purpose_masks: list[str] | None = None,
         organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
@@ -616,7 +615,7 @@ class WebhookHandler:
             return await self._find_document_by_purpose_mask(
                 payment=payment,
                 document_type=DocumentType.customerorder,
-                payment_purpose_mask=payment_purpose_mask,
+                payment_purpose_masks=payment_purpose_masks,
                 organization_id=organization_id,
             )
 
@@ -626,7 +625,7 @@ class WebhookHandler:
         self,
         payment,
         link_type: LinkType,
-        payment_purpose_mask: str | None = None,
+        payment_purpose_masks: list[str] | None = None,
         organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
@@ -654,7 +653,7 @@ class WebhookHandler:
             return await self._find_document_by_purpose_mask(
                 payment=payment,
                 document_type=DocumentType.invoiceout,
-                payment_purpose_mask=payment_purpose_mask,
+                payment_purpose_masks=payment_purpose_masks,
                 organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -665,7 +664,7 @@ class WebhookHandler:
         self,
         payment,
         link_type: LinkType,
-        payment_purpose_mask: str | None = None,
+        payment_purpose_masks: list[str] | None = None,
         organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
@@ -693,7 +692,7 @@ class WebhookHandler:
             return await self._find_document_by_purpose_mask(
                 payment=payment,
                 document_type=DocumentType.demand,
-                payment_purpose_mask=payment_purpose_mask,
+                payment_purpose_masks=payment_purpose_masks,
                 organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -704,7 +703,7 @@ class WebhookHandler:
         self,
         payment,
         link_type: LinkType,
-        payment_purpose_mask: str | None = None,
+        payment_purpose_masks: list[str] | None = None,
         organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
@@ -732,7 +731,7 @@ class WebhookHandler:
             return await self._find_document_by_purpose_mask(
                 payment=payment,
                 document_type=DocumentType.purchaseorder,
-                payment_purpose_mask=payment_purpose_mask,
+                payment_purpose_masks=payment_purpose_masks,
                 organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -743,7 +742,7 @@ class WebhookHandler:
         self,
         payment,
         link_type: LinkType,
-        payment_purpose_mask: str | None = None,
+        payment_purpose_masks: list[str] | None = None,
         organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
@@ -771,7 +770,7 @@ class WebhookHandler:
             return await self._find_document_by_purpose_mask(
                 payment=payment,
                 document_type=DocumentType.invoicein,
-                payment_purpose_mask=payment_purpose_mask,
+                payment_purpose_masks=payment_purpose_masks,
                 organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -782,7 +781,7 @@ class WebhookHandler:
         self,
         payment,
         link_type: LinkType,
-        payment_purpose_mask: str | None = None,
+        payment_purpose_masks: list[str] | None = None,
         organization_id: str | None = None,
         prioritize_oldest: bool = True,
     ):
@@ -810,7 +809,7 @@ class WebhookHandler:
             return await self._find_document_by_purpose_mask(
                 payment=payment,
                 document_type=DocumentType.supply,
-                payment_purpose_mask=payment_purpose_mask,
+                payment_purpose_masks=payment_purpose_masks,
                 organization_id=organization_id,
                 prioritize_oldest=prioritize_oldest,
             )
@@ -821,19 +820,33 @@ class WebhookHandler:
         self,
         payment,
         document_type: DocumentType,
-        payment_purpose_mask: str | None,
+        payment_purpose_masks: list[str] | None,
         organization_id: str | None,
         prioritize_oldest: bool = True,
     ):
         """Найти документ по данным из назначения платежа."""
 
-        name, moment = self._extract_details_from_purpose(
-            payment_purpose=payment.payment_purpose,
-            payment_purpose_mask=payment_purpose_mask,
+        extraction = extract_from_templates(
+            payment.payment_purpose, payment_purpose_masks or []
         )
 
-        if not name:
+        if not extraction:
+            logger.warning(
+                "Назначение платежа '%s' не совпало ни с одним из %d шаблонов",
+                payment.payment_purpose,
+                len(payment_purpose_masks or []),
+            )
             return None
+
+        logger.info(
+            "Шаблон №%d '%s' извлёк из назначения платежа: name='%s', moment=%s",
+            extraction.template_index + 1,
+            extraction.template,
+            extraction.name,
+            extraction.moment,
+        )
+
+        name, moment = extraction.name, extraction.moment
 
         try:
             if document_type == DocumentType.customerorder:
@@ -899,66 +912,4 @@ class WebhookHandler:
         ):
             return None
 
-        return None
-
-    def _extract_details_from_purpose(
-        self, payment_purpose: str | None, payment_purpose_mask: str | None
-    ):
-        if not payment_purpose:
-            return None, None
-
-        if payment_purpose_mask:
-            regex = self._build_mask_regex(payment_purpose_mask)
-            match = regex.search(payment_purpose)
-            if match:
-                name = match.groupdict().get("name")
-                moment_str = match.groupdict().get("moment")
-                moment = self._parse_moment(moment_str) if moment_str else None
-                return name.strip() if name else None, moment
-
-        generic_match = re.search(
-            r"№\s*(?P<name>.+?)(?:\s+от\s+(?P<moment>\d{1,2}[./-]\d{1,2}[./-]\d{2,4}))?(?:\b|$)",
-            payment_purpose,
-            re.IGNORECASE,
-        )
-        if generic_match:
-            name = generic_match.group("name")
-            moment_str = generic_match.group("moment")
-            return name.strip(), self._parse_moment(moment_str)
-
-        patterns = [
-            r"(?:заказ|order|№)\s*(\d+)",
-            r"\b(\d{5,})\b",
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, payment_purpose, re.IGNORECASE)
-            if match:
-                return match.group(1), None
-
-        logger.warning(
-            "Не удалось извлечь данные из назначения платежа: '%s'", payment_purpose
-        )
-        return None, None
-
-    @staticmethod
-    def _build_mask_regex(payment_purpose_mask: str) -> re.Pattern:
-        placeholder_pattern = (
-            r"№\s*(?P<name>.+?)(?:\s+от\s+(?P<moment>\d{1,2}[./-]\d{1,2}[./-]\d{2,4}))?(?:\b|$)"
-        )
-
-        return re.compile(placeholder_pattern, re.IGNORECASE)
-
-    @staticmethod
-    def _parse_moment(moment_str: str | None) -> datetime | None:
-        if not moment_str:
-            return None
-
-        for fmt in ("%d.%m.%Y", "%d.%m.%y", "%d-%m-%Y", "%d/%m/%Y"):
-            try:
-                return datetime.strptime(moment_str, fmt)
-            except ValueError:
-                pass
-
-        logger.warning("Не удалось распарсить дату '%s' из назначения платежа", moment_str)
         return None

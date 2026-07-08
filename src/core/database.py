@@ -82,6 +82,8 @@ async def init_db() -> None:
 def _apply_manual_migrations(sync_conn) -> None:
     """Простые ручные миграции для поддержания схемы."""
 
+    import json
+
     inspector = inspect(sync_conn)
 
     if "webhooksubscriptions" in inspector.get_table_names():
@@ -89,7 +91,30 @@ def _apply_manual_migrations(sync_conn) -> None:
         if "payment_purpose_mask" not in columns:
             sync_conn.exec_driver_sql(
                 "ALTER TABLE webhooksubscriptions "
-                "ADD COLUMN payment_purpose_mask VARCHAR(512)"
+                "ADD COLUMN payment_purpose_mask TEXT"
+            )
+
+        # Нормализация legacy-значений: раньше в payment_purpose_mask хранилась
+        # одна строка, теперь — JSON-массив шаблонов. Старое значение становится
+        # первым (и единственным) шаблоном. Идемпотентно: уже-JSON пропускается.
+        rows = sync_conn.exec_driver_sql(
+            "SELECT id, payment_purpose_mask FROM webhooksubscriptions "
+            "WHERE payment_purpose_mask IS NOT NULL AND TRIM(payment_purpose_mask) != ''"
+        ).fetchall()
+
+        for row_id, raw_mask in rows:
+            value = raw_mask.strip()
+
+            if value.startswith("["):
+                try:
+                    if isinstance(json.loads(value), list):
+                        continue
+                except ValueError:
+                    pass
+
+            sync_conn.exec_driver_sql(
+                "UPDATE webhooksubscriptions SET payment_purpose_mask = ? WHERE id = ?",
+                (json.dumps([value], ensure_ascii=False), row_id),
             )
 
         new_status_columns = {

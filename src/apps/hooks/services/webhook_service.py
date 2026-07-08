@@ -144,7 +144,7 @@ class WebhookService:
         document_type: DocumentType,
         link_type: LinkType,
         document_priority: DocumentPriority,
-        payment_purpose_mask: str | None,
+        payment_purpose_masks: list[str],
         payment_status_on_success: str | None,
         payment_status_on_failure: str | None,
         document_status_on_success: str | None,
@@ -169,7 +169,7 @@ class WebhookService:
             document_type=document_type,
             link_type=link_type,
             document_priority=document_priority,
-            payment_purpose_mask=payment_purpose_mask,
+            payment_purpose_masks=payment_purpose_masks,
             payment_status_on_success=payment_status_on_success,
             payment_status_on_failure=payment_status_on_failure,
             document_status_on_success=document_status_on_success,
@@ -206,7 +206,7 @@ class WebhookService:
             "document_type": document_type.value,
             "link_type": link_type.value,
             "document_priority": document_priority.value,
-            "payment_purpose_mask": payment_purpose_mask,
+            "payment_purpose_mask": payment_purpose_masks,
             "payment_status_on_success": payment_status_on_success,
             "payment_status_on_failure": payment_status_on_failure,
             "document_status_on_success": document_status_on_success,
@@ -222,7 +222,7 @@ class WebhookService:
         document_type: DocumentType = DocumentType.customerorder,
         link_type: LinkType = LinkType.sum_and_counterparty,
         document_priority: DocumentPriority = DocumentPriority.oldest_first,
-        payment_purpose_mask: str | None = None,
+        payment_purpose_masks: list[str] | None = None,
         payment_status_on_success: str | None = None,
         payment_status_on_failure: str | None = None,
         document_status_on_success: str | None = None,
@@ -289,7 +289,7 @@ class WebhookService:
                 result.webhook_entity.document_type = document_type
                 result.webhook_entity.link_type = link_type
                 result.webhook_entity.document_priority = document_priority
-                result.webhook_entity.payment_purpose_mask = payment_purpose_mask
+                result.webhook_entity.payment_purpose_masks = payment_purpose_masks or []
                 result.webhook_entity.payment_status_on_success = payment_status_on_success
                 result.webhook_entity.payment_status_on_failure = payment_status_on_failure
                 result.webhook_entity.document_status_on_success = document_status_on_success
@@ -340,7 +340,7 @@ class WebhookService:
                     existing_db_entity.document_type = document_type
                     existing_db_entity.link_type = link_type
                     existing_db_entity.document_priority = document_priority
-                    existing_db_entity.payment_purpose_mask = payment_purpose_mask
+                    existing_db_entity.payment_purpose_masks = payment_purpose_masks or []
                     existing_db_entity.payment_status_on_success = payment_status_on_success
                     existing_db_entity.payment_status_on_failure = payment_status_on_failure
                     existing_db_entity.document_status_on_success = document_status_on_success
