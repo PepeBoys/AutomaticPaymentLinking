@@ -296,19 +296,9 @@ class ExpenseItemSetupService:
 
         # Локальный импорт во избежание циклической зависимости hooks <-> expense_sync.
         from ...hooks.services.moysklad_client import MoySkladClient
+        from ...hooks.services.shared_webhooks import ensure_webhooks_enabled
 
         client = MoySkladClient(self._auth_service)
-
-        try:
-            existing = await client.list_webhooks()
-        except Exception as exc:  # pragma: no cover - сетевые ошибки
-            result.errors.append(f"Не удалось получить список вебхуков: {exc}")
-            logger.warning("Не удалось получить список вебхуков: %s", exc)
-            existing = []
-
-        existing_keys = {
-            (w.get("entityType"), w.get("action"), w.get("url")) for w in existing
-        }
 
         # Вебхуки синхронизации справочника + вебхуки на создание исходящих
         # документов (для автопроставления статьи расходов).
@@ -322,18 +312,9 @@ class ExpenseItemSetupService:
             for entity_type in EXPENSE_PAYMENT_ENTITY_TYPES
         ]
 
-        for entity_type, action in required:
-            if (entity_type, action, webhook_url) in existing_keys:
-                result.webhooks_existing += 1
-                continue
-            try:
-                await client.create_webhook(
-                    entity_type=entity_type,
-                    action=action,
-                    url=webhook_url,
-                )
-                result.webhooks_created += 1
-            except Exception as exc:  # pragma: no cover - сетевые ошибки
-                msg = f"Не удалось создать вебхук {entity_type}/{action}: {exc}"
-                result.errors.append(msg)
-                logger.warning(msg)
+        # Общие с автопривязкой вебхуки (paymentout/cashout CREATE) могли быть
+        # выключены ею — включаем обратно, а не считаем «уже существующими».
+        ensured = await ensure_webhooks_enabled(client, webhook_url, required)
+        result.webhooks_created += ensured.created
+        result.webhooks_existing += ensured.existing + ensured.enabled
+        result.errors.extend(ensured.errors)

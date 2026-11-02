@@ -39,7 +39,12 @@ class UnitOfWork:
         if self._webhooks is None:
             self._webhooks = WebhookRepository(self._session)
         return self._webhooks
-    
+
+    @property
+    def session(self) -> AsyncSession:
+        """Сессия для запросов за пределами репозиториев модуля."""
+        return self._session
+
     async def commit(self) -> None:
         """Зафиксировать изменения в БД."""
         self._committed = True

@@ -18,6 +18,7 @@ from ..schemas import (
 )
 from ..uow.unit_of_work import UnitOfWork
 from .moysklad_client import MoySkladClient
+from .shared_webhooks import is_used_by_other_features
 from .webhook_handler import WebhookHandler
 from .webhook_operations import WebhookOperationFactory
 
@@ -263,14 +264,31 @@ class WebhookService:
         )
         logger.info("existing_db_entity для %s: %s", payment_type.value, existing_db_entity)
         
-        operation = WebhookOperationFactory.create_operation(
-            enabled=enabled,
-            client=self._client,
-            config=config,
-            existing_db_entity=existing_db_entity,
-        )
+        if not enabled and await is_used_by_other_features(
+            self._uow.session, account_id, config.entity_type, config.action
+        ):
+            # Вебхук общий (например, со статьёй расходов): в МойСклад не
+            # выключаем, автопривязка выключается только в БД ниже.
+            logger.info(
+                "Вебхук %s/%s нужен другой фиче аккаунта %s, в МойСклад остаётся включённым",
+                config.entity_type,
+                config.action,
+                account_id,
+            )
+            result = WebhookOperationResult(
+                operation="kept_enabled_shared",
+                success=True,
+                message="Вебхук используется другой функцией и остаётся включённым",
+            )
+        else:
+            operation = WebhookOperationFactory.create_operation(
+                enabled=enabled,
+                client=self._client,
+                config=config,
+                existing_db_entity=existing_db_entity,
+            )
 
-        result = await operation.execute()
+            result = await operation.execute()
 
         logger.info(
             "Результат операции: account_id=%s, operation=%s, success=%s, has_entity=%s",

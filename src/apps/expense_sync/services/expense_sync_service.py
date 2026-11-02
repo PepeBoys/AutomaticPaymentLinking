@@ -2,6 +2,8 @@
 
 import logging
 
+from src.core.config import settings
+
 from ...counterparty.exceptions import CounterpartyAPIError
 from ...counterparty.services.counterparty_service import CounterpartyService
 from ...customentity.exceptions import (
@@ -11,6 +13,7 @@ from ...customentity.exceptions import (
 from ...customentity.services.customentity_service import CustomEntityService
 from ...expenseitem.services.expenseitem_service import ExpenseItemService
 from ...ms_auth.services.auth_service import MySkladAuthService
+from ..constants import EXPENSE_PAYMENT_ENTITY_TYPES, EXPENSE_PAYMENT_WEBHOOK_ACTION
 from ..exceptions import ExpenseSyncBaseException
 from ..uow.unit_of_work import ExpenseSyncUnitOfWork
 
@@ -202,7 +205,34 @@ class ExpenseSyncService:
             account_id,
             enabled,
         )
+
+        if enabled:
+            errors = await self._ensure_payment_webhooks_enabled()
+            if errors:
+                return {"status": "warning", "enabled": True, "message": "; ".join(errors)}
+
         return {"status": "ok", "enabled": enabled}
+
+    async def _ensure_payment_webhooks_enabled(self) -> list[str]:
+        """Включить вебхуки paymentout/cashout CREATE, если автопривязка их выключила."""
+        webhook_url = settings.ms_webhook_url
+        if not webhook_url:
+            logger.warning("MS_WEBHOOK_URL не задан, вебхуки статьи расходов не проверены")
+            return ["MS_WEBHOOK_URL не задан — вебхуки не проверены"]
+
+        # Локальный импорт во избежание циклической зависимости hooks <-> expense_sync.
+        from ...hooks.services.moysklad_client import MoySkladClient
+        from ...hooks.services.shared_webhooks import ensure_webhooks_enabled
+
+        ensured = await ensure_webhooks_enabled(
+            MoySkladClient(self._auth_service),
+            webhook_url,
+            [
+                (entity_type, EXPENSE_PAYMENT_WEBHOOK_ACTION)
+                for entity_type in EXPENSE_PAYMENT_ENTITY_TYPES
+            ],
+        )
+        return ensured.errors
 
     @staticmethod
     def _norm(value: str | None) -> str:
