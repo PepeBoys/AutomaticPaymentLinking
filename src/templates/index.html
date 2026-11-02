@@ -133,7 +133,7 @@
         const checkboxes = document.querySelectorAll(".js-auto-link-toggle");
         const urlParams = new URLSearchParams(window.location.search);
         const appUid = urlParams.get("appUid");
-        const accountId = "{{ account_id | default('') }}";
+        const accountId = "{{ account_id | default('', true) }}";
 
         const processingFlags = {};
         const webhookStatusCache = {};
