@@ -1,0 +1,46 @@
+<!-- Статья доходов из контрагента (настройка аккаунт-глобальная) -->
+<style>
+    .income-sync-status { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; min-height: 18px; }
+    .income-sync-status__dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; flex: 0 0 auto; transition: background-color .2s; }
+    .js-income-sync-status-line { transition: opacity .25s ease; }
+</style>
+<div class="settings-card js-income-sync-card" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+    <div class="section-title">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M8 6v6M5 9h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Статья доходов из контрагента
+    </div>
+
+    <p class="caption" style="margin: 8px 0 16px; max-width: 680px; color: #6b7280;">
+        Создаёт пользовательский справочник «Статьи доходов», доп. поле контрагента
+        «Статья доходов для привязки» и доп. поле «Статья доходов» во Входящем платеже и
+        Приходном ордере. Заполните справочник и укажите статью у контрагентов — она будет
+        автоматически проставляться в новые Входящие платежи и Приходные ордера. Указанная
+        вручную статья не перезаписывается.
+    </p>
+
+    <div class="income-sync-status">
+        <span class="income-sync-status__dot js-income-sync-status-dot"></span>
+        <span class="js-income-sync-status-line caption" style="font-size: 13px; color: #6b7280;">Загрузка...</span>
+    </div>
+
+    <div class="settings-actions js-income-sync-actions" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <button type="button" class="ui-button ui-button--primary js-income-sync-init">
+            Инициализировать справочник
+        </button>
+    </div>
+
+    <label class="check option">
+        <input class="check__input js-income-sync-toggle" type="checkbox" disabled>
+        <span class="check__box"></span>
+        <span class="check__text">
+            Проставлять статью доходов во Входящий платеж и Приходный ордер
+            <span class="help-tip" tabindex="0">
+                <span class="help-icon" aria-hidden="true">?</span>
+                <span class="help-tooltip">Берёт значение из доп. поля контрагента и ставит его в доп. поле «Статья доходов» документа, если оно не заполнено.</span>
+            </span>
+        </span>
+    </label>
+</div>

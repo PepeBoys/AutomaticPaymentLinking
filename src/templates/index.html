@@ -14,6 +14,8 @@
 
         {% include "partials/expense_item_settings.html" %}
 
+        {% include "partials/income_item_settings.html" %}
+
         <div class="tabs-border js-tabs" style="margin-top: 24px;">
             <ul class="tabs-border__buttons">
                 <li class="tabs-border__button js-tabs-button b-active">
@@ -1278,7 +1280,8 @@
                 .then((response) => response.json())
                 .then((data) => {
                     if (data.status === 'warning') {
-                        expenseSyncToggles.forEach((cb) => (cb.checked = false));
+                        // warning бывает и при включённой фиче (не удалось проверить вебхуки).
+                        expenseSyncToggles.forEach((cb) => (cb.checked = Boolean(data.enabled)));
                         alert(data.message || 'Не удалось включить');
                     } else {
                         expenseSyncToggles.forEach((cb) => (cb.checked = enabled));
@@ -1306,6 +1309,135 @@
         );
 
         loadExpenseSyncStatus();
+
+        // ===== Статья доходов из контрагента =====
+        const incomeSyncToggle = document.querySelector('.js-income-sync-toggle');
+        const incomeSyncInitBtn = document.querySelector('.js-income-sync-init');
+        const incomeSyncActions = document.querySelector('.js-income-sync-actions');
+        const incomeSyncStatusLine = document.querySelector('.js-income-sync-status-line');
+        const incomeSyncStatusDot = document.querySelector('.js-income-sync-status-dot');
+        let incomeSyncPersistent = { text: 'Загрузка...', color: '#6b7280', dot: '#9ca3af' };
+        let incomeSyncFlashTimer = null;
+
+        function applyIncomeSyncStatus(text, color, dot) {
+            incomeSyncStatusLine.textContent = text;
+            incomeSyncStatusLine.style.color = color;
+            incomeSyncStatusLine.style.opacity = '1';
+            incomeSyncStatusDot.style.background = dot || color;
+        }
+
+        function setIncomeSyncPersistent(text, color, dot) {
+            incomeSyncPersistent = { text: text, color: color, dot: dot || color };
+            if (!incomeSyncFlashTimer) applyIncomeSyncStatus(text, color, dot || color);
+        }
+
+        // Транзиентное сообщение: показать и через 4с плавно вернуть постоянный статус.
+        function flashIncomeSyncStatus(text, color) {
+            if (incomeSyncFlashTimer) clearTimeout(incomeSyncFlashTimer);
+            applyIncomeSyncStatus(text, color, color);
+            incomeSyncFlashTimer = setTimeout(() => {
+                incomeSyncFlashTimer = null;
+                incomeSyncStatusLine.style.opacity = '0';
+                setTimeout(() => {
+                    const p = incomeSyncPersistent;
+                    applyIncomeSyncStatus(p.text, p.color, p.dot);
+                }, 250);
+            }, 4000);
+        }
+
+        function renderIncomeSyncStatus(data) {
+            const initialized = Boolean(data && data.initialized);
+
+            incomeSyncToggle.disabled = !initialized;
+            incomeSyncToggle.checked = initialized ? Boolean(data.enabled) : false;
+            // После инициализации кнопка не нужна: если поле удалят в МС,
+            // статус сбросится и кнопка появится снова.
+            incomeSyncActions.style.display = initialized ? 'none' : 'flex';
+
+            if (initialized) {
+                setIncomeSyncPersistent('Справочник и доп. поля созданы', '#059669', '#10b981');
+            } else if (data && data.message) {
+                setIncomeSyncPersistent(data.message, '#d97706', '#d97706');
+            } else {
+                setIncomeSyncPersistent('Справочник ещё не создан', '#6b7280', '#9ca3af');
+            }
+        }
+
+        function loadIncomeSyncStatus() {
+            if (!incomeSyncToggle) return;
+
+            fetch(buildApiUrl('/api/income-sync/status'), { headers: buildHeaders() })
+                .then((response) => response.json())
+                .then(renderIncomeSyncStatus)
+                .catch((error) => {
+                    console.error('Ошибка загрузки статуса статьи доходов:', error);
+                    setIncomeSyncPersistent('Не удалось загрузить статус', '#ef4444', '#ef4444');
+                });
+        }
+
+        function runIncomeSyncInit() {
+            incomeSyncInitBtn.disabled = true;
+            flashIncomeSyncStatus('Создание справочника и доп. полей…', '#6b7280');
+
+            fetch(buildApiUrl('/api/income-sync/init'), {
+                method: 'POST',
+                headers: buildHeaders({ 'Content-Type': 'application/json' }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.errors && data.errors.length) {
+                        flashIncomeSyncStatus('Готово с предупреждениями: ' + data.errors.join('; '), '#d97706');
+                    } else {
+                        flashIncomeSyncStatus('Готово', '#059669');
+                    }
+                    loadIncomeSyncStatus();
+                })
+                .catch((error) => {
+                    console.error('Ошибка инициализации статьи доходов:', error);
+                    flashIncomeSyncStatus('Ошибка инициализации', '#ef4444');
+                })
+                .finally(() => {
+                    incomeSyncInitBtn.disabled = false;
+                });
+        }
+
+        function runIncomeSyncToggle(enabled) {
+            incomeSyncToggle.disabled = true;
+
+            fetch(buildApiUrl('/api/income-sync/toggle'), {
+                method: 'POST',
+                headers: buildHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ enabled }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    incomeSyncToggle.checked = Boolean(data.enabled);
+                    if (data.status === 'warning') {
+                        alert(data.message || 'Не удалось включить');
+                    } else {
+                        flashIncomeSyncStatus(
+                            enabled ? 'Автопроставление включено' : 'Автопроставление выключено',
+                            '#059669'
+                        );
+                    }
+                })
+                .catch((error) => {
+                    console.error('Ошибка переключения статьи доходов:', error);
+                    incomeSyncToggle.checked = !enabled;
+                    alert('Ошибка связи с сервером');
+                })
+                .finally(() => {
+                    incomeSyncToggle.disabled = false;
+                });
+        }
+
+        if (incomeSyncToggle) {
+            incomeSyncInitBtn.addEventListener('click', runIncomeSyncInit);
+            incomeSyncToggle.addEventListener('change', function () {
+                runIncomeSyncToggle(this.checked);
+            });
+            loadIncomeSyncStatus();
+        }
     });
 </script>
 
