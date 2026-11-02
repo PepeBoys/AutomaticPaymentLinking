@@ -106,6 +106,15 @@ class BasePaymentService(Generic[TEntity, TClient], ABC):
         )
         return self._to_entity(updated_data)
 
+    async def update_customentity_attribute(
+        self, payment_id: str, attribute_id: str, element_href: str
+    ) -> TEntity:
+        """Записать в доп. поле «справочник» ссылку на элемент справочника."""
+        updated_data = await self._client.update_customentity_attribute(
+            payment_id, attribute_id, element_href
+        )
+        return self._to_entity(updated_data)
+
     async def find_customentity_attribute_by_name(self, name: str) -> Optional[dict]:
         """Найти доп. поле платежа типа «справочник» по имени (с ``customentity_id``)."""
         attributes = await self._client.list_attributes()

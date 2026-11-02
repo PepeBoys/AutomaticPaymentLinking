@@ -1,8 +1,8 @@
 """Базовые доменные сущности для платежных документов."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -23,3 +23,12 @@ class BasePaymentEntity:
     project_meta_href: Optional[str] = None
     sales_channel_meta_href: Optional[str] = None
     expense_item_meta_href: Optional[str] = None
+    # Доп. поля в сыром виде МС: [{id, name, type, value}, ...]
+    attributes: list[dict] = field(default_factory=list)
+
+    def get_attribute_value(self, attribute_id: str) -> Optional[Any]:
+        """Значение доп. поля по id его метаданных (None, если не заполнено)."""
+        for attr in self.attributes:
+            if attr.get("id") == attribute_id:
+                return attr.get("value")
+        return None

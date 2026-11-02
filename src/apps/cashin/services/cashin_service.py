@@ -64,4 +64,5 @@ class CashInService(BasePaymentService[CashInEntity, BasePaymentClient]):
             meta_href=data["meta"]["href"],
             project_meta_href=project_href,
             sales_channel_meta_href=sales_channel_href,
+            attributes=data.get("attributes", []) or [],
         )

@@ -321,6 +321,67 @@ class BasePaymentClient(ABC):
                 details={"error": str(exc)},
             ) from exc
 
+    async def update_customentity_attribute(
+        self, payment_id: str, attribute_id: str, element_href: str
+    ) -> Dict[str, Any]:
+        """Записать в доп. поле типа «справочник» ссылку на элемент справочника.
+
+        Остальные доп. поля платежа МС не трогает — передаётся только одно.
+        """
+
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/{self.entity_type}/{payment_id}"
+                logger.debug(
+                    "Обновление доп. поля %s платежа %s -> %s",
+                    attribute_id,
+                    payment_id,
+                    element_href,
+                )
+
+                payload = {
+                    "attributes": [
+                        {
+                            "meta": {
+                                "href": (
+                                    f"{base_url}/entity/{self.entity_type}"
+                                    f"/metadata/attributes/{attribute_id}"
+                                ),
+                                "type": "attributemetadata",
+                                "mediaType": "application/json",
+                            },
+                            "value": {
+                                "meta": {
+                                    "href": element_href,
+                                    "type": "customentity",
+                                    "mediaType": "application/json",
+                                }
+                            },
+                        }
+                    ]
+                }
+
+                resp = await client.put(url, json=payload)
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            raise PaymentAPIError(
+                "Ошибка HTTP при обновлении доп. поля платежа",
+                details={
+                    "status_code": exc.response.status_code,
+                    "error": str(exc),
+                    "response": exc.response.text[:1000],
+                },
+            ) from exc
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            raise PaymentAPIError(
+                "Ошибка при обновлении доп. поля платежа",
+                details={"error": str(exc)},
+            ) from exc
+
     async def update_sales_channel(
         self, payment_id: str, sales_channel_href: str
     ) -> Dict[str, Any]:

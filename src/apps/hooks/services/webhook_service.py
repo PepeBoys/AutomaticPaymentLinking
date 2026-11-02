@@ -406,6 +406,7 @@ class WebhookService:
         invoicein_service=None,
         supply_service=None,
         expense_sync_handler=None,
+        income_sync_handler=None,
     ) -> None:
         """
         Обработать входящий webhook от МойСклад.
@@ -468,6 +469,13 @@ class WebhookService:
             )
 
             if event.meta.type == "paymentin" and event.action == "CREATE":
+                if income_sync_handler is not None:
+                    await income_sync_handler.apply_income_item_to_payment(
+                        account_id=event.accountId,
+                        href=event.meta.href,
+                        payment_service=paymentin_service,
+                    )
+
                 subscription = await self._uow.webhooks.get_active_subscription_for_event(
                     account_id=event.accountId,
                     entity_type=event.meta.type,
@@ -489,6 +497,13 @@ class WebhookService:
                 else:
                     logger.warning("Активная подписка не найдена для аккаунта %s и типа %s", event.accountId, event.meta.type)
             elif event.meta.type == "cashin" and event.action == "CREATE":
+                if income_sync_handler is not None:
+                    await income_sync_handler.apply_income_item_to_payment(
+                        account_id=event.accountId,
+                        href=event.meta.href,
+                        payment_service=cashin_service,
+                    )
+
                 subscription = await self._uow.webhooks.get_active_subscription_for_event(
                     account_id=event.accountId,
                     entity_type=event.meta.type,
