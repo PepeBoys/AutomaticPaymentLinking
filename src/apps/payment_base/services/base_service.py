@@ -2,8 +2,12 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Generic, Optional, TypeVar
 
+from ...customentity.attributes import (
+    build_customentity_attribute_payload,
+    find_customentity_attribute,
+)
 from ...ms_auth.services.auth_service import MySkladAuthService
 from ..domain.entities import BasePaymentEntity
 from .base_client import BasePaymentClient
@@ -101,6 +105,25 @@ class BasePaymentService(Generic[TEntity, TClient], ABC):
             payment_id, expense_item_href
         )
         return self._to_entity(updated_data)
+
+    async def find_customentity_attribute_by_name(self, name: str) -> Optional[dict]:
+        """Найти доп. поле платежа типа «справочник» по имени (с ``customentity_id``)."""
+        attributes = await self._client.list_attributes()
+        return find_customentity_attribute(attributes, name)
+
+    async def attribute_exists(self, attribute_id: str) -> bool:
+        """Существует ли доп. поле платежа с данным id."""
+        attributes = await self._client.list_attributes()
+        return any(attr.get("id") == attribute_id for attr in attributes)
+
+    async def create_customentity_attribute(
+        self, name: str, customentity_metadata_id: str
+    ) -> dict:
+        """Создать доп. поле платежа типа «справочник» (сырой ответ МС с id)."""
+        payload = build_customentity_attribute_payload(
+            self._client._get_base_url(), name, customentity_metadata_id
+        )
+        return await self._client.create_attribute(payload)
 
     @staticmethod
     def _extract_type_from_href(href: str) -> str:

@@ -70,6 +70,7 @@ async def init_db() -> None:
     """Инициализация БД."""
     import src.apps.expense_sync.models
     import src.apps.hooks.models
+    import src.apps.income_sync.models
     import src.apps.vendor_api.models
 
     from .models import Base

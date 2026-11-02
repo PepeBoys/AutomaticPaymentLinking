@@ -144,6 +144,69 @@ class BasePaymentClient(ABC):
                 details={"error": str(exc)},
             ) from exc
 
+    @retry(
+        stop=stop_after_attempt(RETRY_ATTEMPTS),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
+    async def list_attributes(self) -> list[Dict[str, Any]]:
+        """Получить список доп. полей (атрибутов метаданных) платежа."""
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/{self.entity_type}/metadata/attributes"
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+                if isinstance(data, list):
+                    return data
+                return data.get("rows", [])
+        except httpx.HTTPStatusError as exc:
+            raise PaymentAPIError(
+                "Ошибка HTTP при получении доп. полей платежа",
+                details={"status_code": exc.response.status_code, "error": str(exc)},
+            ) from exc
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            raise PaymentAPIError(
+                "Ошибка при получении доп. полей платежа",
+                details={"error": str(exc)},
+            ) from exc
+
+    async def create_attribute(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Создать доп. поле (атрибут метаданных) платежа.
+
+        Без tenacity-ретрая: создание не идемпотентно.
+        """
+        try:
+            base_url = self._get_base_url()
+            headers = self._get_headers()
+
+            async with httpx.AsyncClient(headers=headers, timeout=self._timeout) as client:
+                url = f"{base_url}/entity/{self.entity_type}/metadata/attributes"
+                logger.info(
+                    "Создание доп. поля %s: %s", self.entity_type, payload.get("name")
+                )
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            body = exc.response.text[:1000] if exc.response is not None else None
+            raise PaymentAPIError(
+                "Ошибка HTTP при создании доп. поля платежа",
+                details={
+                    "status_code": exc.response.status_code,
+                    "error": str(exc),
+                    "response": body,
+                },
+            ) from exc
+        except Exception as exc:  # pragma: no cover - сетевые ошибки
+            raise PaymentAPIError(
+                "Ошибка при создании доп. поля платежа",
+                details={"error": str(exc)},
+            ) from exc
+
     async def update_state(self, payment_id: str, state_id: str) -> Dict[str, Any]:
         """Обновить статус платежа."""
         try:

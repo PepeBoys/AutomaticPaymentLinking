@@ -19,6 +19,11 @@ from ...expense_sync.constants import (
     EXPENSE_PAYMENT_WEBHOOK_ACTION,
 )
 from ...expense_sync.models import ExpenseItemSyncConfig
+from ...income_sync.constants import (
+    INCOME_PAYMENT_ENTITY_TYPES,
+    INCOME_PAYMENT_WEBHOOK_ACTION,
+)
+from ...income_sync.models import IncomeItemSyncConfig
 from .moysklad_client import MoySkladClient
 
 logger = logging.getLogger(__name__)
@@ -36,6 +41,18 @@ async def is_used_by_other_features(
             ExpenseItemSyncConfig.ms_account_id == account_id,
             ExpenseItemSyncConfig.enabled.is_(True),
             ExpenseItemSyncConfig.counterparty_attribute_id.is_not(None),
+        )
+        if await session.scalar(stmt) is not None:
+            return True
+
+    if (
+        entity_type in INCOME_PAYMENT_ENTITY_TYPES
+        and action == INCOME_PAYMENT_WEBHOOK_ACTION
+    ):
+        stmt = select(IncomeItemSyncConfig.id).where(
+            IncomeItemSyncConfig.ms_account_id == account_id,
+            IncomeItemSyncConfig.enabled.is_(True),
+            IncomeItemSyncConfig.counterparty_attribute_id.is_not(None),
         )
         if await session.scalar(stmt) is not None:
             return True
