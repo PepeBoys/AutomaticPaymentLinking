@@ -3,7 +3,12 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from .dependencies import AuthHeader, get_vendor_activation_service, get_vendor_service
-from .schemas import ActivationPayload, ActivationResponse, VendorEventPayload
+from .schemas import (
+    ActivationPayload,
+    ActivationResponse,
+    DeactivationPayload,
+    VendorEventPayload,
+)
 from .services import VendorApiService
 
 logger = logging.getLogger(__name__)
@@ -32,10 +37,13 @@ async def deactivate_solution(
     app_id: str,
     account_id: str,
     authorization: AuthHeader,
+    payload: DeactivationPayload | None = None,
     service: VendorApiService = Depends(get_vendor_service),
 ):
     token = _extract_bearer(authorization)
-    await service.deactivate_app(app_id, account_id, token)
+    await service.deactivate_app(
+        app_id, account_id, token, cause=payload.cause if payload else None
+    )
 
 
 @router.put("/{app_id}/{account_id}/event", status_code=status.HTTP_202_ACCEPTED)

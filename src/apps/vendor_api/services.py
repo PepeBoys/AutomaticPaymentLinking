@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 # только подписка, а токен остаётся прежним.
 SUBSCRIPTION_ONLY_CAUSES = ("TariffChanged", "Autoprolongation")
 
+# Приостановка платного решения за неоплату и возобновление после неё:
+# настройки аккаунта нужно сохранить (документация Vendor API МС).
+SUSPEND_CAUSE = "Suspend"
+RESUME_CAUSE = "Resume"
+
 
 class VendorApiService:
     def __init__(
@@ -105,8 +110,9 @@ class VendorApiService:
             access_token, base_url=base_url, account_id=account_id
         )
 
-        # 5) cleanup old webhooks ТОЛЬКО если это реальная переустановка (аккаунт был неактивен)
-        if not was_active:
+        # 5) cleanup old webhooks ТОЛЬКО если это реальная переустановка (аккаунт был неактивен).
+        # Resume — возобновление после приостановки: настройки сохранены, не чистим.
+        if not was_active and payload.cause != RESUME_CAUSE:
             cleanup_stats = await self._webhook_service.cleanup_account_webhooks(account_id)
             logger.info(
                 "Очистка вебхуков перед активацией account_id=%s: "
@@ -122,7 +128,7 @@ class VendorApiService:
             logger.info("Изменения после очистки вебхуков зафиксированы")
         else:
             logger.info(
-                "Пропуск очистки вебхуков (аккаунт уже активен). "
+                "Пропуск очистки вебхуков (аккаунт уже активен или возобновлён после приостановки). "
                 "Существующие вебхуки будут проверены и переиспользованы. "
                 "Если URL изменился - он будет обновлён."
             )
@@ -145,22 +151,32 @@ class VendorApiService:
         )
         return ActivationResponse(status="Activated")
 
-    async def deactivate_app(self, app_id: str, account_id: str, jwt_token: str) -> None:
+    async def deactivate_app(
+        self, app_id: str, account_id: str, jwt_token: str, cause: str | None = None
+    ) -> None:
         self._validate_app_id(app_id)
         claims = self._verify_jwt(jwt_token)
         await self._guard_replay(claims)
 
-        logger.info(
-            "Деактивация: очистка только БД (токен отозван МС до вызова DELETE). "
-            "Вебхуки останутся в МС и будут переиспользованы при следующей активации."
-        )
-        
-        deleted_count = await self._uow.webhooks.delete_all_by_account_id(account_id)
-        logger.info(
-            "Удалено записей из БД при деактивации: %d для account_id=%s",
-            deleted_count,
-            account_id,
-        )
+        if cause == SUSPEND_CAUSE:
+            logger.info(
+                "Приостановка (Suspend): настройки автопривязки сохранены для "
+                "возобновления, account_id=%s",
+                account_id,
+            )
+        else:
+            logger.info(
+                "Деактивация (cause=%s): очистка только БД (токен отозван МС до вызова DELETE). "
+                "Вебхуки останутся в МС и будут переиспользованы при следующей активации.",
+                cause,
+            )
+
+            deleted_count = await self._uow.webhooks.delete_all_by_account_id(account_id)
+            logger.info(
+                "Удалено записей из БД при деактивации: %d для account_id=%s",
+                deleted_count,
+                account_id,
+            )
 
         await self._accounts.deactivate_account(account_id)
         self._auth_service.clear_access_token()

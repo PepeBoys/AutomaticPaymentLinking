@@ -32,3 +32,11 @@ class VendorEventPayload(BaseModel):
     eventType: str
     data: Dict[str, Any] | None = None
     moment: datetime | None = None
+
+
+class DeactivationPayload(BaseModel):
+    """Тело DELETE при деактивации: Uninstall или Suspend (приостановка за неоплату)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    cause: str | None = None
