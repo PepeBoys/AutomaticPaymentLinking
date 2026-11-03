@@ -15,6 +15,8 @@ from ..expenseitem.dependencies import get_expenseitem_service
 from ..expenseitem.services.expenseitem_service import ExpenseItemService
 from ..ms_auth.dependencies import get_ms_auth_service
 from ..ms_auth.services.auth_service import MySkladAuthService
+from ..tariffs.dependencies import get_tariff_service
+from ..tariffs.service import TariffService
 from .services.expense_sync_service import ExpenseSyncService
 from .services.setup_service import ExpenseItemSetupService
 from .services.sync_service import ExpenseSyncHandler
@@ -76,6 +78,7 @@ async def get_expense_sync_handler(
     expenseitem_service: ExpenseItemService = Depends(get_expenseitem_service),
     customentity_service: CustomEntityService = Depends(get_customentity_service),
     counterparty_service: CounterpartyService = Depends(get_counterparty_service),
+    tariff_service: TariffService = Depends(get_tariff_service),
 ) -> ExpenseSyncHandler:
     return ExpenseSyncHandler(
         auth_service=auth_service,
@@ -83,6 +86,7 @@ async def get_expense_sync_handler(
         expenseitem_service=expenseitem_service,
         customentity_service=customentity_service,
         counterparty_service=counterparty_service,
+        tariff_service=tariff_service,
     )
 
 
