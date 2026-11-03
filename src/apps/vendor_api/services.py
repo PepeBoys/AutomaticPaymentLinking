@@ -17,6 +17,10 @@ from .security import JwtVerificationError, verify_vendor_jwt
 
 logger = logging.getLogger(__name__)
 
+# Причины активации, при которых МС не передаёт токен (access[]): меняется
+# только подписка, а токен остаётся прежним.
+SUBSCRIPTION_ONLY_CAUSES = ("TariffChanged", "Autoprolongation")
+
 
 class VendorApiService:
     def __init__(
@@ -53,12 +57,32 @@ class VendorApiService:
             claims.get("jti"),
         )
 
-        # 3) get remap token (issued by MS) + base_url
-        access_token, base_url = self._extract_access_token_and_base_url(payload)
-
         # Проверяем был ли аккаунт активен ДО обновления
         existing_account = await self._accounts.get_by_account_id(account_id)
         was_active = existing_account and existing_account.is_active
+
+        # 3) get remap token (issued by MS) + base_url
+        token_and_url = self._find_access_token_and_base_url(payload)
+        if token_and_url is None:
+            # При смене тарифа и автопродлении МС не присылает access[]:
+            # токен прежний, повторная настройка не нужна.
+            if (
+                payload.cause in SUBSCRIPTION_ONLY_CAUSES
+                and was_active
+                and existing_account.access_token
+            ):
+                await self._session.commit()
+                logger.info(
+                    "Активация без токена (cause=%s): account_id=%s, токен сохранён прежний",
+                    payload.cause,
+                    account_id,
+                )
+                return ActivationResponse(status="Activated")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing access_token in payload.access[]",
+            )
+        access_token, base_url = token_and_url
         
         if was_active:
             logger.info(
@@ -207,10 +231,12 @@ class VendorApiService:
         expires_at = datetime.fromtimestamp(exp, tz=UTC)
         await self._jtis.save(jti=jti, expires_at=expires_at)
 
-    def _extract_access_token_and_base_url(self, payload: ActivationPayload) -> tuple[str, str]:
+    def _find_access_token_and_base_url(
+        self, payload: ActivationPayload
+    ) -> tuple[str, str] | None:
         """
         Vendor API activation payload contains access_token inside access[] items.
-        We pick the first item where access_token is present.
+        We pick the first item where access_token is present (None if absent).
 
         base_url:
           - Prefer resource from access[] (often ends with /api/remap/1.2 or /api/remap/1.2/)
@@ -220,8 +246,4 @@ class VendorApiService:
             if a.access_token:
                 base_url = (a.resource or settings.ms_base_url).rstrip("/")
                 return a.access_token, base_url
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing access_token in payload.access[]",
-        )
+        return None
