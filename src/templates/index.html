@@ -12,6 +12,8 @@
             Автоматически связывает входящие платежи с документами в МойСклад
         </p>
 
+        <p class="caption js-tariff-line" style="display: none; margin: -12px 0 20px; font-size: 13px; color: #6b7280;"></p>
+
         {% include "partials/expense_item_settings.html" %}
 
         <div class="tabs-border js-tabs" style="margin-top: 24px;">
@@ -1090,6 +1092,56 @@
             }, 4000);
         }
 
+        // ===== Тариф: недоступные функции блокируются (бэкенд всё равно проверяет) =====
+        const featureAvailability = {};
+
+        function isFeatureLocked(feature) {
+            return featureAvailability[feature] === false;
+        }
+
+        // Заблокированную функцию можно только выключить, но не включить/инициализировать.
+        function applyExpenseSyncLock() {
+            if (!isFeatureLocked('expense_items')) return;
+            expenseSyncInitBtns.forEach((b) => (b.disabled = true));
+            expenseSyncToggles.forEach((cb) => (cb.disabled = !cb.checked));
+        }
+
+        function formatTariffDate(value) {
+            const d = new Date(value);
+            return isNaN(d) ? '' : d.toLocaleDateString('ru-RU');
+        }
+
+        function renderTariff(data) {
+            const line = document.querySelector('.js-tariff-line');
+            if (line && data.tariffs_enabled && data.known) {
+                let text = 'Тариф: ' + (data.tariff_name || '—');
+                if (data.trial) text += ' (пробный)';
+                if (data.expiry) text += ' · до ' + formatTariffDate(data.expiry);
+                line.textContent = text;
+                line.style.display = 'block';
+            }
+
+            Object.entries(data.features || {}).forEach(([feature, info]) => {
+                featureAvailability[feature] = Boolean(info.available);
+                document.querySelectorAll('[data-feature="' + feature + '"]').forEach((card) => {
+                    const notice = card.querySelector('.js-feature-lock-notice');
+                    card.style.opacity = info.available ? '' : '0.75';
+                    if (notice) {
+                        notice.textContent = info.available ? '' : info.message;
+                        notice.style.display = info.available ? 'none' : 'block';
+                    }
+                });
+            });
+            applyExpenseSyncLock();
+        }
+
+        function loadTariff() {
+            return fetch(buildApiUrl('/api/tariff'), { headers: buildHeaders() })
+                .then((response) => response.json())
+                .then(renderTariff)
+                .catch((error) => console.error('Ошибка загрузки тарифа:', error));
+        }
+
         function renderExpenseSyncStatus(data) {
             const initialized = Boolean(data && data.initialized);
 
@@ -1101,6 +1153,7 @@
             expenseSyncInitBtns.forEach((btn) => {
                 btn.textContent = initialized ? 'Обновить справочник' : 'Инициализировать справочник';
             });
+            applyExpenseSyncLock();
 
             if (initialized) {
                 // Постоянный статус (синхронизировано / N расхождений) выставит diff.
@@ -1250,7 +1303,9 @@
             })
                 .then((response) => response.json())
                 .then((data) => {
-                    if (data.errors && data.errors.length) {
+                    if (data.detail) {
+                        flashExpenseSyncStatus(String(data.detail), '#d97706');
+                    } else if (data.errors && data.errors.length) {
                         flashExpenseSyncStatus('Готово с предупреждениями: ' + data.errors.join('; '), '#d97706');
                     } else {
                         flashExpenseSyncStatus('Готово', '#059669');
@@ -1264,6 +1319,7 @@
                 .finally(() => {
                     expenseSyncBusy = false;
                     expenseSyncInitBtns.forEach((b) => (b.disabled = false));
+                    applyExpenseSyncLock();
                 });
         }
 
@@ -1277,7 +1333,10 @@
             })
                 .then((response) => response.json())
                 .then((data) => {
-                    if (data.status === 'warning') {
+                    if (data.detail) {
+                        expenseSyncToggles.forEach((cb) => (cb.checked = !enabled));
+                        alert(data.detail);
+                    } else if (data.status === 'warning') {
                         expenseSyncToggles.forEach((cb) => (cb.checked = false));
                         alert(data.message || 'Не удалось включить');
                     } else {
@@ -1295,6 +1354,7 @@
                 })
                 .finally(() => {
                     expenseSyncToggles.forEach((cb) => (cb.disabled = false));
+                    applyExpenseSyncLock();
                 });
         }
 
@@ -1305,7 +1365,7 @@
             })
         );
 
-        loadExpenseSyncStatus();
+        loadTariff().finally(loadExpenseSyncStatus);
     });
 </script>
 

@@ -23,7 +23,7 @@
     .expense-diff__row--mod .expense-diff__m { color: #d97706; }
     .expense-diff__row--info .expense-diff__m { color: #9ca3af; }
 </style>
-<div class="settings-card js-expense-sync-card" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+<div class="settings-card js-expense-sync-card" data-feature="expense_items" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
     <div class="section-title">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
@@ -38,6 +38,8 @@
         поле у контрагентов, статья расходов будет автоматически проставляться в Исходящие
         платежи и Расходные ордера по их контрагенту.
     </p>
+
+    <div class="js-feature-lock-notice caption" style="display: none; margin: 0 0 12px; font-size: 13px; color: #b45309;"></div>
 
     <div class="expense-sync-status">
         <span class="expense-sync-status__dot js-expense-sync-status-dot"></span>
