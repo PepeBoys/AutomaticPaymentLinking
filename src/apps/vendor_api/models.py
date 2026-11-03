@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.models import Base
@@ -25,6 +25,18 @@ class VendorAccount(Base):
     app_uid: Mapped[str | None] = mapped_column(
         String(256),
         nullable=True,
+    )
+
+    # Подписка на решение (из активации МС или GET .../status Vendor API).
+    tariff_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    tariff_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    tariff_trial: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    tariff_expiry: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Когда подписку последний раз получали от МС (в т.ч. неудачно).
+    subscription_synced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 

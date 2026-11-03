@@ -26,6 +26,7 @@ from src.apps.hooks.exception_handlers import (
 )
 from src.apps.ms_auth.api import router as ms_auth_router
 from src.apps.paymentin.api import router as paymentin_router
+from src.apps.tariffs.api import router as tariffs_router
 from src.apps.paymentin.exception_handlers import (
     EXCEPTION_HANDLERS as PAYMENTIN_EXCEPTION_HANDLERS,
 )
@@ -147,3 +148,4 @@ app.include_router(paymentin_router, prefix="/api/paymentin", tags=["paymentin"]
 app.include_router(
     expense_sync_router, prefix="/api/expense-sync", tags=["expense_sync"]
 )
+app.include_router(tariffs_router, prefix="/api/tariff", tags=["tariffs"])

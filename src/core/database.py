@@ -86,6 +86,21 @@ def _apply_manual_migrations(sync_conn) -> None:
 
     inspector = inspect(sync_conn)
 
+    if "vendoraccounts" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("vendoraccounts")}
+        subscription_columns = {
+            "tariff_id": "VARCHAR(64)",
+            "tariff_name": "VARCHAR(256)",
+            "tariff_trial": "BOOLEAN",
+            "tariff_expiry": "DATETIME",
+            "subscription_synced_at": "DATETIME",
+        }
+        for column_name, column_type in subscription_columns.items():
+            if column_name not in columns:
+                sync_conn.exec_driver_sql(
+                    f"ALTER TABLE vendoraccounts ADD COLUMN {column_name} {column_type}"
+                )
+
     if "webhooksubscriptions" in inspector.get_table_names():
         columns = {column["name"] for column in inspector.get_columns("webhooksubscriptions")}
         if "payment_purpose_mask" not in columns:

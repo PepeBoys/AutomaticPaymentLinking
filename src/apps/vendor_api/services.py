@@ -76,6 +76,7 @@ class VendorApiService:
                 and was_active
                 and existing_account.access_token
             ):
+                await self._accounts.update_subscription(account_id, payload.subscription)
                 await self._session.commit()
                 logger.info(
                     "Активация без токена (cause=%s): account_id=%s, токен сохранён прежний",
@@ -104,6 +105,8 @@ class VendorApiService:
             base_url=base_url,
             app_uid=settings.ms_app_uid,
         )
+        if payload.subscription:
+            await self._accounts.update_subscription(account_id, payload.subscription)
 
         # 5) configure MS auth for this request context
         self._auth_service.set_access_token(

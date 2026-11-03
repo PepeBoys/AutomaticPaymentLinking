@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     ms_app_uid: str = ""
     ms_vendor_secret_key: str = ""
     vendor_api_endpoint_base: str = ""
+
+    # Тарифы решения: {"<tariffId>": {"name": "...", "features": ["income_items", ...]}}.
+    # Пусто — тарификация выключена, все функции доступны.
+    tariff_features: dict[str, dict] = {}
     
     # Logging
     log_level: str = "INFO"
