@@ -1,0 +1,44 @@
+<!-- Статьи доходов/расходов в первичных документах (настройка аккаунт-глобальная) -->
+<div class="settings-card js-document-items-card" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+    <div class="section-title">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M5 7h6M5 10h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Статьи в документах
+    </div>
+
+    <p class="caption" style="margin: 8px 0 16px; max-width: 680px; color: #6b7280;">
+        После привязки платежа ставит статью из контрагента в документ, к которому привязан
+        платёж, или во всю его цепочку (заказ, его счета и отгрузки/приёмки). Статья доходов —
+        в заказы покупателей, счета покупателям и отгрузки, статья расходов — в заказы
+        поставщикам, счета поставщиков и приёмки. Указанная вручную статья не меняется.
+    </p>
+
+    <div class="income-sync-status">
+        <span class="income-sync-status__dot js-document-items-status-dot"></span>
+        <span class="js-document-items-status-line caption" style="font-size: 13px; color: #6b7280;">Загрузка...</span>
+    </div>
+
+    <div class="settings-actions js-document-items-actions" style="display: none; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <button type="button" class="ui-button ui-button--primary js-document-items-init">
+            Создать поля в документах
+        </button>
+    </div>
+
+    {% for side, label in [("income", "Статья доходов"), ("expense", "Статья расходов")] %}
+    <div style="margin-bottom: 12px;">
+        <div class="caption" style="margin-bottom: 6px; font-size: 12px; font-weight: 500;">{{ label }}</div>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            {% for value, text in [("off", "Не проставлять"), ("linked", "Только в документ привязки"), ("chain", "Во все документы цепочки")] %}
+            <label class="radio option" style="margin-bottom: 0;">
+                <input class="radio__input js-document-items-mode" type="radio" name="document_items_{{ side }}"
+                       value="{{ value }}" data-side="{{ side }}" disabled {% if value == "off" %}checked{% endif %}>
+                <span class="radio__box"></span>
+                <span class="radio__text">{{ text }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>

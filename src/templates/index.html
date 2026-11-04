@@ -16,6 +16,8 @@
 
         {% include "partials/income_item_settings.html" %}
 
+        {% include "partials/document_items_settings.html" %}
+
         <div class="tabs-border js-tabs" style="margin-top: 24px;">
             <ul class="tabs-border__buttons">
                 <li class="tabs-border__button js-tabs-button b-active">
@@ -1429,6 +1431,101 @@
                 .finally(() => {
                     incomeSyncToggle.disabled = false;
                 });
+        }
+
+        // ===== Статьи в документах =====
+        const documentItemsCard = document.querySelector('.js-document-items-card');
+
+        function setDocumentItemsStatus(text, color) {
+            const line = document.querySelector('.js-document-items-status-line');
+            line.textContent = text;
+            line.style.color = color;
+            document.querySelector('.js-document-items-status-dot').style.background = color;
+        }
+
+        function renderDocumentItems(data) {
+            const sides = { income: 'статьи доходов', expense: 'статьи расходов' };
+            const missingDict = Object.keys(sides).filter((s) => !data[s].dictionary_ready);
+            const missingAttrs = Object.keys(sides).filter((s) => data[s].dictionary_ready && !data[s].attributes_ready);
+
+            document.querySelectorAll('.js-document-items-mode').forEach((radio) => {
+                const side = data[radio.dataset.side];
+                radio.disabled = !side.attributes_ready;
+                radio.checked = radio.value === side.mode;
+            });
+            document.querySelector('.js-document-items-actions').style.display = missingAttrs.length ? 'flex' : 'none';
+
+            if (missingAttrs.length) {
+                setDocumentItemsStatus('Поля в документах ещё не созданы', '#6b7280');
+            } else if (missingDict.length === 2) {
+                setDocumentItemsStatus('Сначала инициализируйте справочники статей доходов и расходов', '#d97706');
+            } else if (missingDict.length) {
+                setDocumentItemsStatus('Для ' + sides[missingDict[0]] + ' сначала инициализируйте справочник', '#d97706');
+            } else {
+                setDocumentItemsStatus('Поля в документах созданы', '#059669');
+            }
+        }
+
+        function loadDocumentItems() {
+            return fetch(buildApiUrl('/api/document-items/status'), { headers: buildHeaders() })
+                .then((response) => response.json())
+                .then(renderDocumentItems)
+                .catch((error) => {
+                    console.error('Ошибка загрузки статей в документах:', error);
+                    setDocumentItemsStatus('Не удалось загрузить статус', '#ef4444');
+                });
+        }
+
+        function runDocumentItemsInit() {
+            const btn = document.querySelector('.js-document-items-init');
+            btn.disabled = true;
+            setDocumentItemsStatus('Создание полей в документах…', '#6b7280');
+            fetch(buildApiUrl('/api/document-items/init'), {
+                method: 'POST',
+                headers: buildHeaders({ 'Content-Type': 'application/json' }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.errors && data.errors.length) alert(data.errors.join('; '));
+                    return loadDocumentItems();
+                })
+                .catch((error) => {
+                    console.error('Ошибка создания полей в документах:', error);
+                    setDocumentItemsStatus('Ошибка создания полей', '#ef4444');
+                })
+                .finally(() => { btn.disabled = false; });
+        }
+
+        function saveDocumentItemsMode(side, mode) {
+            fetch(buildApiUrl('/api/document-items/settings'), {
+                method: 'POST',
+                headers: buildHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ [side + '_mode']: mode }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.status !== 'ok') {
+                        alert(data.message || data.detail || 'Не удалось сохранить');
+                        return loadDocumentItems();
+                    }
+                    renderDocumentItems(data);
+                    setDocumentItemsStatus('Сохранено', '#059669');
+                })
+                .catch((error) => {
+                    console.error('Ошибка сохранения режима статей в документах:', error);
+                    alert('Ошибка связи с сервером');
+                    loadDocumentItems();
+                });
+        }
+
+        if (documentItemsCard) {
+            document.querySelector('.js-document-items-init').addEventListener('click', runDocumentItemsInit);
+            document.querySelectorAll('.js-document-items-mode').forEach((radio) =>
+                radio.addEventListener('change', function () {
+                    if (this.checked) saveDocumentItemsMode(this.dataset.side, this.value);
+                })
+            );
+            loadDocumentItems();
         }
 
         if (incomeSyncToggle) {
