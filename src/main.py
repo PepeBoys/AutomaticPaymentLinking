@@ -19,6 +19,7 @@ from src.apps.customerorder.api import router as customerorder_router
 from src.apps.customerorder.exception_handlers import (
     EXCEPTION_HANDLERS as CUSTOMERORDER_EXCEPTION_HANDLERS,
 )
+from src.apps.document_items.api import router as document_items_router
 from src.apps.expense_sync.api import router as expense_sync_router
 from src.apps.hooks.api import router as hooks_router
 from src.apps.hooks.exception_handlers import (
@@ -149,3 +150,6 @@ app.include_router(
     expense_sync_router, prefix="/api/expense-sync", tags=["expense_sync"]
 )
 app.include_router(income_sync_router, prefix="/api/income-sync", tags=["income_sync"])
+app.include_router(
+    document_items_router, prefix="/api/document-items", tags=["document_items"]
+)
