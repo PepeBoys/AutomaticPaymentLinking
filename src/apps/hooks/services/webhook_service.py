@@ -407,6 +407,7 @@ class WebhookService:
         supply_service=None,
         expense_sync_handler=None,
         income_sync_handler=None,
+        document_items_handler=None,
     ) -> None:
         """
         Обработать входящий webhook от МойСклад.
@@ -493,6 +494,10 @@ class WebhookService:
                         continue
 
                     result = await handler.handle_paymentin_create(event.meta.href, subscription)
+                    if result["success"] and document_items_handler is not None:
+                        await document_items_handler.apply_after_linking(
+                            event.accountId, event.meta.href, outgoing=False
+                        )
                     logger.info("Результат обработки платежа: success=%s, message=%s", result["success"], result["message"])
                 else:
                     logger.warning("Активная подписка не найдена для аккаунта %s и типа %s", event.accountId, event.meta.type)
@@ -521,6 +526,10 @@ class WebhookService:
                         continue
 
                     result = await handler.handle_cashin_create(event.meta.href, subscription)
+                    if result["success"] and document_items_handler is not None:
+                        await document_items_handler.apply_after_linking(
+                            event.accountId, event.meta.href, outgoing=False
+                        )
                     logger.info(
                         "Результат обработки приходного ордера: success=%s, message=%s",
                         result["success"],
@@ -559,6 +568,10 @@ class WebhookService:
                     result = await handler.handle_paymentout_create(
                         event.meta.href, subscription
                     )
+                    if result["success"] and document_items_handler is not None:
+                        await document_items_handler.apply_after_linking(
+                            event.accountId, event.meta.href, outgoing=True
+                        )
                     logger.info(
                         "Результат обработки исходящего платежа: success=%s, message=%s",
                         result["success"],
@@ -597,6 +610,10 @@ class WebhookService:
                     result = await handler.handle_cashout_create(
                         event.meta.href, subscription
                     )
+                    if result["success"] and document_items_handler is not None:
+                        await document_items_handler.apply_after_linking(
+                            event.accountId, event.meta.href, outgoing=True
+                        )
                     logger.info(
                         "Результат обработки расходного ордера: success=%s, message=%s",
                         result["success"],

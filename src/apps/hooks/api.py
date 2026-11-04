@@ -8,6 +8,7 @@ from ..cashout.dependencies import CashOutSvcDep
 from ..customerorder.dependencies import CustomerOrderSvcDep
 from ..demand.dependencies import DemandSvcDep
 from ..expense_sync.dependencies import ExpenseSyncHandlerDep
+from ..document_items.dependencies import DocumentItemsHandlerDep
 from ..income_sync.dependencies import IncomeSyncHandlerDep
 from ..invoicein.dependencies import InvoiceInSvcDep
 from ..invoiceout.dependencies import InvoiceOutSvcDep
@@ -240,6 +241,7 @@ async def receive_moysklad_webhook(
     supply_service: SupplySvcDep,
     expense_sync_handler: ExpenseSyncHandlerDep,
     income_sync_handler: IncomeSyncHandlerDep,
+    document_items_handler: DocumentItemsHandlerDep,
     request_id: RequestIdQuery = None,
 ) -> Response:
     logger.info(
@@ -265,6 +267,7 @@ async def receive_moysklad_webhook(
         supply_service=supply_service,
         expense_sync_handler=expense_sync_handler,
         income_sync_handler=income_sync_handler,
+        document_items_handler=document_items_handler,
     )
 
     return Response(status_code=204)
