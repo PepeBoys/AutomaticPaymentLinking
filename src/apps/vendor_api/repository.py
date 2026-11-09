@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from sqlalchemy import delete, select
@@ -40,6 +40,30 @@ class VendorAccountRepository:
             app_uid=app_uid,
         )
         self._session.add(account)
+        await self._session.flush()
+        return account
+
+    async def update_subscription(
+        self, account_id: str, subscription: dict | None
+    ) -> Optional[VendorAccount]:
+        """Сохранить подписку из МС ({tariffId, tariffName, trial, expiryMoment}).
+
+        subscription=None фиксирует только попытку синхронизации (чтобы не
+        запрашивать статус у МС на каждый запрос, если он недоступен).
+        """
+        account = await self.get_by_account_id(account_id)
+        if not account:
+            return None
+
+        if subscription:
+            account.tariff_id = subscription.get("tariffId")
+            account.tariff_name = subscription.get("tariffName")
+            account.tariff_trial = subscription.get("trial")
+            expiry = subscription.get("expiryMoment")
+            account.tariff_expiry = (
+                datetime.fromisoformat(expiry.replace("Z", "+00:00")) if expiry else None
+            )
+        account.subscription_synced_at = datetime.now(UTC)
         await self._session.flush()
         return account
 

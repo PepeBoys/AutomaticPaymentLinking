@@ -23,6 +23,8 @@ from ...customentity.services.customentity_service import CustomEntityService
 from ...expenseitem.exceptions import ExpenseItemAPIError, ExpenseItemNotFoundError
 from ...expenseitem.services.expenseitem_service import ExpenseItemService
 from ...ms_auth.services.auth_service import MySkladAuthService
+from ...tariffs.constants import FEATURE_EXPENSE_ITEMS
+from ...tariffs.service import TariffService
 from ..uow.unit_of_work import ExpenseSyncUnitOfWork
 
 logger = logging.getLogger(__name__)
@@ -60,12 +62,14 @@ class ExpenseSyncHandler:
         expenseitem_service: ExpenseItemService,
         customentity_service: CustomEntityService,
         counterparty_service: CounterpartyService,
+        tariff_service: Optional[TariffService] = None,
     ) -> None:
         self._auth_service = auth_service
         self._uow = uow
         self._expenseitem_service = expenseitem_service
         self._customentity_service = customentity_service
         self._counterparty_service = counterparty_service
+        self._tariff_service = tariff_service
 
     async def _get_mirror_id(self, account_id: str) -> Optional[str]:
         config = await self._uow.configs.get_by_account_id(account_id)
@@ -295,6 +299,16 @@ class ExpenseSyncHandler:
         """
         config = await self._uow.configs.get_by_account_id(account_id)
         if not config or not config.enabled or not config.counterparty_attribute_id:
+            return
+
+        # Настройки сохраняются при понижении тарифа — проверяем при каждом событии.
+        if self._tariff_service and not await self._tariff_service.has_feature(
+            account_id, FEATURE_EXPENSE_ITEMS
+        ):
+            logger.info(
+                "Статья расходов не проставлена: функция не входит в тариф аккаунта %s",
+                account_id,
+            )
             return
 
         try:

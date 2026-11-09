@@ -17,6 +17,15 @@ from .security import JwtVerificationError, verify_vendor_jwt
 
 logger = logging.getLogger(__name__)
 
+# Причины активации, при которых МС не передаёт токен (access[]): меняется
+# только подписка, а токен остаётся прежним.
+SUBSCRIPTION_ONLY_CAUSES = ("TariffChanged", "Autoprolongation")
+
+# Приостановка платного решения за неоплату и возобновление после неё:
+# настройки аккаунта нужно сохранить (документация Vendor API МС).
+SUSPEND_CAUSE = "Suspend"
+RESUME_CAUSE = "Resume"
+
 
 class VendorApiService:
     def __init__(
@@ -53,12 +62,33 @@ class VendorApiService:
             claims.get("jti"),
         )
 
-        # 3) get remap token (issued by MS) + base_url
-        access_token, base_url = self._extract_access_token_and_base_url(payload)
-
         # Проверяем был ли аккаунт активен ДО обновления
         existing_account = await self._accounts.get_by_account_id(account_id)
         was_active = existing_account and existing_account.is_active
+
+        # 3) get remap token (issued by MS) + base_url
+        token_and_url = self._find_access_token_and_base_url(payload)
+        if token_and_url is None:
+            # При смене тарифа и автопродлении МС не присылает access[]:
+            # токен прежний, повторная настройка не нужна.
+            if (
+                payload.cause in SUBSCRIPTION_ONLY_CAUSES
+                and was_active
+                and existing_account.access_token
+            ):
+                await self._accounts.update_subscription(account_id, payload.subscription)
+                await self._session.commit()
+                logger.info(
+                    "Активация без токена (cause=%s): account_id=%s, токен сохранён прежний",
+                    payload.cause,
+                    account_id,
+                )
+                return ActivationResponse(status="Activated")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing access_token in payload.access[]",
+            )
+        access_token, base_url = token_and_url
         
         if was_active:
             logger.info(
@@ -75,14 +105,17 @@ class VendorApiService:
             base_url=base_url,
             app_uid=settings.ms_app_uid,
         )
+        if payload.subscription:
+            await self._accounts.update_subscription(account_id, payload.subscription)
 
         # 5) configure MS auth for this request context
         self._auth_service.set_access_token(
             access_token, base_url=base_url, account_id=account_id
         )
 
-        # 5) cleanup old webhooks ТОЛЬКО если это реальная переустановка (аккаунт был неактивен)
-        if not was_active:
+        # 5) cleanup old webhooks ТОЛЬКО если это реальная переустановка (аккаунт был неактивен).
+        # Resume — возобновление после приостановки: настройки сохранены, не чистим.
+        if not was_active and payload.cause != RESUME_CAUSE:
             cleanup_stats = await self._webhook_service.cleanup_account_webhooks(account_id)
             logger.info(
                 "Очистка вебхуков перед активацией account_id=%s: "
@@ -98,7 +131,7 @@ class VendorApiService:
             logger.info("Изменения после очистки вебхуков зафиксированы")
         else:
             logger.info(
-                "Пропуск очистки вебхуков (аккаунт уже активен). "
+                "Пропуск очистки вебхуков (аккаунт уже активен или возобновлён после приостановки). "
                 "Существующие вебхуки будут проверены и переиспользованы. "
                 "Если URL изменился - он будет обновлён."
             )
@@ -121,22 +154,32 @@ class VendorApiService:
         )
         return ActivationResponse(status="Activated")
 
-    async def deactivate_app(self, app_id: str, account_id: str, jwt_token: str) -> None:
+    async def deactivate_app(
+        self, app_id: str, account_id: str, jwt_token: str, cause: str | None = None
+    ) -> None:
         self._validate_app_id(app_id)
         claims = self._verify_jwt(jwt_token)
         await self._guard_replay(claims)
 
-        logger.info(
-            "Деактивация: очистка только БД (токен отозван МС до вызова DELETE). "
-            "Вебхуки останутся в МС и будут переиспользованы при следующей активации."
-        )
-        
-        deleted_count = await self._uow.webhooks.delete_all_by_account_id(account_id)
-        logger.info(
-            "Удалено записей из БД при деактивации: %d для account_id=%s",
-            deleted_count,
-            account_id,
-        )
+        if cause == SUSPEND_CAUSE:
+            logger.info(
+                "Приостановка (Suspend): настройки автопривязки сохранены для "
+                "возобновления, account_id=%s",
+                account_id,
+            )
+        else:
+            logger.info(
+                "Деактивация (cause=%s): очистка только БД (токен отозван МС до вызова DELETE). "
+                "Вебхуки останутся в МС и будут переиспользованы при следующей активации.",
+                cause,
+            )
+
+            deleted_count = await self._uow.webhooks.delete_all_by_account_id(account_id)
+            logger.info(
+                "Удалено записей из БД при деактивации: %d для account_id=%s",
+                deleted_count,
+                account_id,
+            )
 
         await self._accounts.deactivate_account(account_id)
         self._auth_service.clear_access_token()
@@ -207,10 +250,12 @@ class VendorApiService:
         expires_at = datetime.fromtimestamp(exp, tz=UTC)
         await self._jtis.save(jti=jti, expires_at=expires_at)
 
-    def _extract_access_token_and_base_url(self, payload: ActivationPayload) -> tuple[str, str]:
+    def _find_access_token_and_base_url(
+        self, payload: ActivationPayload
+    ) -> tuple[str, str] | None:
         """
         Vendor API activation payload contains access_token inside access[] items.
-        We pick the first item where access_token is present.
+        We pick the first item where access_token is present (None if absent).
 
         base_url:
           - Prefer resource from access[] (often ends with /api/remap/1.2 or /api/remap/1.2/)
@@ -220,8 +265,4 @@ class VendorApiService:
             if a.access_token:
                 base_url = (a.resource or settings.ms_base_url).rstrip("/")
                 return a.access_token, base_url
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing access_token in payload.access[]",
-        )
+        return None

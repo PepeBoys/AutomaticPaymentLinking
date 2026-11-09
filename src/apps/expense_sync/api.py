@@ -2,8 +2,11 @@
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
+from ..ms_auth.dependencies import AuthSvcDep
+from ..tariffs.constants import FEATURE_EXPENSE_ITEMS
+from ..tariffs.dependencies import TariffSvcDep, require_feature
 from .dependencies import ExpenseSetupSvcDep, ExpenseSyncSvcDep
 from .schemas import (
     ExpenseSyncDiffResponse,
@@ -30,7 +33,11 @@ async def get_diff(service: ExpenseSyncSvcDep):
     return ExpenseSyncDiffResponse(**diff)
 
 
-@router.post("/init", response_model=ExpenseSyncInitResponse)
+@router.post(
+    "/init",
+    response_model=ExpenseSyncInitResponse,
+    dependencies=[require_feature(FEATURE_EXPENSE_ITEMS)],
+)
 async def initialize(service: ExpenseSetupSvcDep):
     """Создать/доинициализировать инфраструктуру синхронизации статей расходов."""
     result = await service.initialize()
@@ -48,5 +55,18 @@ async def initialize(service: ExpenseSetupSvcDep):
 
 
 @router.post("/toggle")
-async def toggle(payload: ExpenseSyncTogglePayload, service: ExpenseSyncSvcDep):
+async def toggle(
+    payload: ExpenseSyncTogglePayload,
+    service: ExpenseSyncSvcDep,
+    auth_service: AuthSvcDep,
+    tariffs: TariffSvcDep,
+):
+    # Выключить можно всегда, включить — только если функция входит в тариф.
+    if payload.enabled and not await tariffs.has_feature(
+        auth_service.get_account_id(), FEATURE_EXPENSE_ITEMS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=tariffs.locked_message(FEATURE_EXPENSE_ITEMS),
+        )
     return await service.set_enabled(payload.enabled)

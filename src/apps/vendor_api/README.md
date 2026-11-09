@@ -297,7 +297,7 @@ async def activate_solution(...):
     await service._guard_replay(claims)
     
     # 3. Extract access_token
-    access_token, base_url = service._extract_access_token_and_base_url(payload)
+    access_token, base_url = service._find_access_token_and_base_url(payload)
     
     # 4. Save to DB
     await service._accounts.upsert_account(
